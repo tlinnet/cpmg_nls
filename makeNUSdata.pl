@@ -42,7 +42,7 @@ $data2="";
 sysread(IN,$head,32);
 syswrite(OUT,$head,32) ;
 
-for ($i = 1; $i <= $ni; $i++){
+for ($i = 0; $i < $ni; $i++){
     sysread(IN,$head1,28);
     sysread(IN,$data1,$bytes);
     sysread(IN,$head2,28);
