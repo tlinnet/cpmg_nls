@@ -1,0 +1,46 @@
+#!/bin/bash
+
+PLANE="ERR"
+if [ -f procpar ]; then
+PLANE=`awk '/^ncyc /{f=1;next}f{print $1;exit}' procpar`
+PLANE=$(($PLANE -1))
+#echo $PLANE
+fi
+
+if [ -f fid.com ]; then
+  if grep -Fq "sleep" fid.com; then
+  echo "sleep found in fid.com and is removed"
+  sed -i '/^sleep/d' fid.com
+  fi
+  if grep -Fq "var2pipe -in ./0.fid" fid.com; then
+  echo "0.fid found in fid.com and changed to 'fid'"
+  sed -i "s/0.fid/fid/g" fid.com
+  fi
+fi
+
+if [ ! -f convert_all.com ]; then
+echo "'convert_all.com' does not exist, I will copy it over, alter it, and run it"
+cp /sbinlab2/public/CPMG_scripts/convert_all.com $PWD
+  if [ $PLANE != "ERR" ]; then
+  sed -i "s/x <= 35/x <= $PLANE/g" convert_all.com
+  sed -i '/^$/d' convert_all.com
+  fi
+fi
+
+echo 
+echo "I suggest run convert_all.com"
+echo "####################"
+echo "csh convert_all.com"
+echo "####################"
+
+echo "Now we need to transform the spectra."
+echo "Process one of the files normally and copy the processing script to the experiment folder."
+echo "[m]->RClick Process 2D->Basic 2D"
+echo "Save->Execute->Done; then; RClick File->Select File->test.ft2->Read/draw->Done"
+echo "Press [h], and find P0 and P1, and push [m], change parameters and update script, save/execute, push [r]"
+echo "If your spectra look reversed (i.e. if your peaks do not seem to match your reference spectrum) it might be solved by changing to"
+echo "| nmrPipe -fn FT -neg \ to the fft.com script to the third lowest line."
+echo "Name the script fft.com, copy to above experiment folder.. "
+echo "For example from the '0' directory: cp nmrproc.com ../fft.com"
+echo "And then run the next CPMG script"
+

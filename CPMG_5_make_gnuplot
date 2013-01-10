@@ -1,0 +1,141 @@
+#!/bin/bash
+echo "use by: CPMG_5_make_gnuplot table.txt"
+##########################################
+### use by: CPMG_5_make_gnuplot table.txt peaks_20121005.shift.sort
+##########################################
+
+FILE=$(basename $1)
+FILENAME="${FILE%.*}"
+FILEEXT="${FILE##*.}"
+
+rm -rf ${FILENAME}_plots
+mkdir -p ${FILENAME}_plots
+cd ${FILENAME}_plots
+cp ../$FILE .
+
+MINX=`sed -n 2p $FILE | awk '{print $1}'`
+MAXX=`tail -1 $FILE | awk '{print $1}'`
+
+MAXI=`awk -F ' ' '{print NF}' $FILE | head -n 1`
+MAXI=$(($MAXI -1))
+#MAXI=20
+for i in $(seq 2 $MAXI); do
+OUTFILE=${i}
+RESI=`awk -v j=$i '/^time /{print $j;exit}' $FILE`
+cat > $OUTFILE.plt <<!EOF
+set term postscript eps enhanced color "Helvetica" 14
+
+set title "CPMG on residue $RESI"
+set size ratio 0.3
+set xlabel "v(CPMG) (Hz)"
+set ylabel "R2 (s-1)"
+#set nokey
+#set key autotitle columnheader
+set key outside right
+
+set xrange [0.1:$MAXX]
+
+#FIT_LIMIT = 1e-15
+set fit errorvariables
+r20=10
+r2(x)=r20
+fit [1:$MAXX] r2(x) '$FILE' using 1:$i via r20
+r2_FIT_NDF=FIT_NDF
+r2_FIT_STDFIT=FIT_STDFIT
+r2_FIT_WSSR=FIT_WSSR
+r2_WSSR_NDF=FIT_WSSR/FIT_NDF
+
+R20b=r20;kEXb=1000;PHI=10000
+#low=r20/2
+#high=r20*2
+#A(x) = (high-low)/pi*(atan(x)+pi/2)+low
+#R2cpmg_fast(x)=A(R20b)+(PHI/kEXb)*(1-2*tanh(kEXb/4/x)/kEXb*x*2)
+#fit [1:$MAXX] R2cpmg_fast(x) '$FILE' using 1:$i via R20b,kEXb,PHI
+#R20b=A(R20b)
+#R20b_err=A(R20b+R20b_err)-A(R20b)
+#R2cpmg_fast(x)=R20b+(PHI/kEXb)*(1-2*tanh(kEXb/4/x)/kEXb*x*2)
+
+#low=0
+#high=100*kEXb
+#A(x) = (high-low)/pi*(atan(x)+pi/2)+low
+#R2cpmg_fast(x)=R20b+(PHI/A(kEXb))*(1-2*tanh(A(kEXb)/4/x)/A(kEXb)*x*2)
+#fit [1:$MAXX] R2cpmg_fast(x) '$FILE' using 1:$i via R20b,kEXb,PHI
+#kEXb=A(kEXb)
+#kEXb_err=A(kEXb+kEXb_err)-A(kEXb)
+#R2cpmg_fast(x)=R20b+(PHI/kEXb)*(1-2*tanh(kEXb/4/x)/kEXb*x*2)
+
+R2cpmg_fast(x)=R20b+(PHI/kEXb)*(1-2*tanh(kEXb/4/x)/kEXb*x*2)
+fit [1:$MAXX] R2cpmg_fast(x) '$FILE' using 1:$i via R20b,kEXb,PHI
+R2cpmg_fast_FIT_NDF=FIT_NDF
+R2cpmg_fast_FIT_STDFIT=FIT_STDFIT
+R2cpmg_fast_FIT_WSSR=FIT_WSSR
+R2cpmg_fast_WSSR_NDF=FIT_WSSR/FIT_NDF
+
+set label sprintf("r20=%1.2f +- %1.2f",r20,r20_err) at graph 0.7,0.30 font "Helvetica,9"
+set label sprintf("R20b=%1.2f +- %1.2f",R20b,R20b_err) at graph 0.7,0.25 font "Helvetica,9"
+set label sprintf("kEXb=%1.2f +- %1.2f",kEXb,kEXb_err) at graph 0.7,0.20 font "Helvetica,9"
+set label sprintf("PHI=%1.2f +- %1.2f",PHI,PHI_err) at graph 0.7,0.15 font "Helvetica,9"
+
+set output "$OUTFILE.eps"
+plot '$FILE' using 1:$i title "Col:$i",\
+r2(x), R2cpmg_fast(x)
+
+col=$i
+resi='$RESI'
+
+set print '${OUTFILE}_simple.fit'
+print "Col\t", "Resi\t", "r20\t", "r20_err\t", "r2_FIT_NDF\t", "r2_FIT_STDFIT\t", "r2_FIT_WSSR\t", "r2_WSSR_NDF\t"
+print gprintf("%4.0f\t", col), resi," \t", gprintf("%3.5f\t", r20), gprintf("%3.5f\t", r20_err), gprintf("%5.0f\t", r2_FIT_NDF), gprintf("%5.5f\t", r2_FIT_STDFIT), gprintf("%5.5f\t", r2_FIT_WSSR), gprintf("%5.5f\t", r2_WSSR_NDF)
+set print '${OUTFILE}_complex.fit'
+print "Col\t", "Resi\t", "R20b\t", "R20b_err\t", "kEXb\t", "kEXb_err\t", "PHI\t", "PHI_err\t", "R2cpmg_fast_FIT_NDF\t", "R2cpmg_fast_FIT_STDFIT\t", "R2cpmg_fast_FIT_WSSR\t", "R2cpmg_fast_WSSR_NDF\t"
+print gprintf("%4.0f\t", col), resi," \t", gprintf("%3.5f\t", R20b), gprintf("%3.5f\t", R20b_err), gprintf("%3.5f\t", kEXb), gprintf("%3.5f\t", kEXb_err), gprintf("%3.5f\t", PHI), gprintf("%3.5f\t", PHI_err), gprintf("%5.0f\t", R2cpmg_fast_FIT_NDF), gprintf("%5.5f\t", R2cpmg_fast_FIT_STDFIT), gprintf("%5.5f\t", R2cpmg_fast_FIT_WSSR), gprintf("%5.5f\t", R2cpmg_fast_WSSR_NDF)
+set print
+!EOF
+
+gnuplot $OUTFILE.plt 1> /dev/null 2> /dev/null
+#! eps2png -resolution 200 $OUTFILE.eps
+#rm $OUTFILE.plt
+if [ ! -f ${FILENAME}_simple.fit ]; then head -n+1 ${OUTFILE}_simple.fit >> ${FILENAME}_simple.fit; fi
+tail -n+2 ${OUTFILE}_simple.fit >> ${FILENAME}_simple.fit
+if [ ! -f ${FILENAME}_complex.fit ]; then head -n+1 ${OUTFILE}_complex.fit >> ${FILENAME}_complex.fit; fi
+tail -n+2 ${OUTFILE}_complex.fit >> ${FILENAME}_complex.fit
+rm ${OUTFILE}_simple.fit
+rm ${OUTFILE}_complex.fit
+done
+
+############################################
+# Make start analysing graph
+############################################
+FILESPEC=${FILENAME}_simple_complex
+paste ${FILENAME}_simple.fit ${FILENAME}_complex.fit > $FILESPEC.fit
+cat > $FILESPEC.plt <<!EOF
+set term postscript eps enhanced color
+set title "Statistical overview"
+set size ratio 0.5
+set xlabel "File number"
+set ylabel "FIT_STDFIT = sqrt(WSSR/NDF)"
+#set ytics nomirror
+#set y2tics border
+#set y2label "F-test"
+##set xrange[0.5:$NRLINES-0.5]
+##set xtics 1
+#set yrange[0:0.025]
+
+set output "$FILESPEC.eps"
+
+plot "$FILESPEC.fit" using (\$1):(\$6) title "simple: rms of residuals" with lp,\\
+"$FILESPEC.fit" using (\$9):(\$18) title "complex: rms of residuals" with lp
+#"$FILESPEC.fit" using (\$1):(((\$7-\$11)/(\$5-\$17))/(\$19/\$17)) title "F-test" with lp axis x1y2
+
+# Convert to .pdf and .png
+#! epstopdf $FILESPEC.eps
+#! eps2png -resolution 200 $FILESPEC.eps
+!EOF
+gnuplot $FILESPEC.plt
+
+for epsfile in *.eps; do eps2png -resolution 200 $epsfile; echo "Making png: $epsfile"; done
+#CPMG_6_find_stat $FILESPEC.fit 0.95 1 50; evince $FILESPEC.report.pdf &
+echo "CPMG_6_find_stat $FILESPEC.fit 0.95 1 50 peaks_20121005.shift.sort; evince $FILESPEC.report.pdf &"
+#pymol $FILESPEC.pml &
+echo "pymol $FILESPEC.pml &"
+
