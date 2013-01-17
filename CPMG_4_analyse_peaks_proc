@@ -1,0 +1,97 @@
+#!/bin/bash
+
+PEAKFILES=($( ls *.sparky 2>/dev/null ))
+echo "Number of peakfiles ${#PEAKFILES[*]}"
+echo "Following sparky files was found:" 
+echo -e "${PEAKFILES[*]} \n"
+PEAKS=${PEAKFILES[0]}
+read -p "Input peak file: " -i "$PEAKS" -e PEAKS
+if [ ! -f $PEAKS ]; then
+echo "File $PEAKS does not exist -> I exit!"
+exit
+fi
+
+FILE=$(basename $PEAKS)
+FILENAME="${FILE%.*}"
+FILEEXT="${FILE##*.}"
+
+mkdir -p "CPMG_$FILENAME"
+cp -n $FILE "CPMG_$FILENAME"
+echo "Executing: /sbinlab2/public/CPMG_scripts/stPeakList.pl 0.proc/test.dat CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat"
+/sbinlab2/public/CPMG_scripts/stPeakList.pl 0.proc/test.dat CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat
+cd "CPMG_$FILENAME"
+awk '{ sub(/\?-\?/, $1"&"); print }' ${FILENAME}_0.dat > ${FILENAME}_0.temp
+mv -f ${FILENAME}_0.temp ${FILENAME}_0.dat
+
+rm lst
+if [ ! -f lst ]; then
+  read -p "file: 'lst' does not exist, should I make one? " -i "y" -e TEXT
+  if [ $TEXT == "y" ]; then
+    echo "test.dat" >> lst
+  fi
+fi
+
+PLANE="ERR"
+if [ -f ../procpar ]; then
+PLANE=`awk '/^ncyc /{f=1;next}f{print $1;exit}' ../procpar`
+PLANE=$(($PLANE -1))
+#echo $PLANE
+fi
+
+rm sum_all.com
+if [ ! -f sum_all.com ]; then
+echo "'sum_all.com' does not exist, I will copy it over, alter it, and run it"
+cp /sbinlab2/public/CPMG_scripts/sum_all.com $PWD
+  if [ $PLANE != "ERR" ]; then
+  sed -i "s/set x = 0/set x = 0;cd ../g" sum_all.com
+  sed -i "s/-in ..\/peaks.dat -out peaks.ser/-in ..\/CPMG_${FILENAME}\/${FILENAME}_0.dat -out ..\/CPMG_${FILENAME}\/${FILENAME}_\$\{x\}.ser/g" sum_all.com
+  sed -i "s/x <= 35/x <= $PLANE/g" sum_all.com
+  sed -i "s/-list ..\/lst/-list ..\/CPMG_${FILENAME}\/lst/g" sum_all.com
+  sed -i '/^$/d' sum_all.com
+  fi
+fi
+#cat sum_all.com
+./sum_all.com
+
+rm time.dat
+if [ $PLANE != "ERR" ]; then
+  if [ ! -f time.dat ]; then
+    read -p "time.dat does not exist, should I make one? " -i "y" -e TEXT
+    if [ $TEXT == "y" ]; then
+      NCYC=`awk '/^ncyc /{f=1;next}f{print $0;exit}' ../procpar`
+      #echo $NCYC
+      IFS=' ' read -a NCYCARR <<< "$NCYC"
+      #echo ${NCYCARR[0]}
+      for i in $(seq 1 $((${#NCYCARR[*]}-1))); do
+	    echo $(($i-1)) ${NCYCARR[$i]} >> time.dat
+      done
+      echo "Made a time.dat file"
+    fi
+  fi   
+fi
+
+TIMET2="ERR"
+if [ -f ../procpar ]; then
+TIMET2=`awk '/^time_T2 /{f=1;next}f{print $2;exit}' ../procpar`
+fi
+
+rm table.txt
+rm extract_sums_to_table.pl
+if [ ! -f extract_sums_to_table.pl ]; then
+echo "'extract_sums_to_table.pl' does not exist, I will copy it over, alter it, and run it"
+cp /sbinlab2/public/CPMG_scripts/extract_sums_to_table.pl $PWD
+  if [ $PLANE != "ERR" ]; then
+  sed -i "s/file_count=35/file_count=$PLANE/g" extract_sums_to_table.pl
+  fi
+  if [ $TIMET2 != "ERR" ]; then
+  sed -i "s/0.090/$TIMET2/g" extract_sums_to_table.pl
+  fi
+sed -i 's/\\#time/time/g' extract_sums_to_table.pl
+sed -i "s/\$filebase=\"\"/\$filebase=\"${FILENAME}_\"/g" extract_sums_to_table.pl
+sed -i "s/\$filebase\$i\/peaks.ser/\$filebase\$i.ser/g" extract_sums_to_table.pl
+#sed -i 's/printf "%5s "/printf "%5s \\n"/g' extract_sums_to_table.pl
+#sed -i 's/printf "%3.2f  "/printf "%3.2f  \\n"/g' extract_sums_to_table.pl
+#sed -i 's/printf "%7.6e "/printf "%7.6e \\n"/g' extract_sums_to_table.pl
+fi
+./extract_sums_to_table.pl > table.txt
+#CPMG_5_make_gnuplot table.txt
