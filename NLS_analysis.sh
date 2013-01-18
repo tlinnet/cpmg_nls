@@ -104,8 +104,8 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk") then
 #setenv NCYCPLANESEND 0
-#set METHODS = "FT CS MDD coMDD"
-set METHODS = "coMDD"
+set METHODS = "FT CS MDD coMDD"
+#set METHODS = "coMDD"
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
         echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
