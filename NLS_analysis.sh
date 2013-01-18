@@ -26,8 +26,8 @@ NLS_stPeakList.pl ../128_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat
 
 #set PROCESS="int_resi"
 #set PROCESS="int_corr_ft_method"
-set PROCESS="int_corr_ft_method_all"
-#set PROCESS="int_corr_ft_method_all_awk"
+#set PROCESS="int_corr_ft_method_all"
+set PROCESS="int_corr_ft_method_all_awk"
 
 if ( $PROCESS == "int_resi") then
 #setenv NCYCPLANESEND 0
@@ -130,7 +130,6 @@ foreach METHOD ( $METHODS )
     NLS_make_gnuplot_corr_all_awk.sh allplanes $METHOD $METHODLIST
     mkdir -p ${PROCESS}/${METHOD}
     mv -f *${METHOD}* ${PROCESS}/${METHOD}
-    mv fit.log ${PROCESS}/${METHOD}
 end
 
 else
