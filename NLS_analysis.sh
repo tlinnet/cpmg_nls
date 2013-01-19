@@ -1,7 +1,7 @@
 #!/bin/tcsh
 
 # /sbinlab2/tlinnet/Desktop/Link to CPMG_data_test/kte/080716_cpmgDisp_HEWLpH65.fid
-setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65.fid"
+setenv CPMGFID "/net/haddock/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65.fid"
 setenv NIINCR 2
 setenv ANADIR $CPMGFID/ft2_data/analysis
 setenv SPARKYPEAKLIST sparky.list
@@ -12,6 +12,7 @@ setenv PROCPARORI ${PROCPAR}_ori
 setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPARORI`
 setenv NCYCPLANESEND `expr $NCYCPLANES - 1`
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPARORI`
+#setenv NI 126
 setenv NIEND `expr $NI - 1`
 setenv NP `awk '/^np /{f=1;next}f{print $2;exit}' $PROCPARORI`
 
@@ -30,8 +31,9 @@ NLS_stPeakList.pl ../128_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat
 set PROCESS="int_corr_ft_method_all_awk"
 
 if ( $PROCESS == "int_resi") then
-#setenv NCYCPLANESEND 0
 set METHODS = "FT CS MDD coMDD"
+#set METHODS = "coMDD"
+#setenv NCYCPLANESEND 1
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
         echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
@@ -50,9 +52,9 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method") then
-#setenv NCYCPLANESEND 0
 set METHODS = "FT CS MDD coMDD"
 #set METHODS = "coMDD"
+#setenv NCYCPLANESEND 0
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
         echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
@@ -72,8 +74,8 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method_all") then
-#setenv NCYCPLANESEND 0
 set METHODS = "FT CS MDD coMDD"
+#setenv NCYCPLANESEND 0
 #set METHODS = "coMDD"
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
@@ -103,8 +105,8 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk") then
-#setenv NCYCPLANESEND 0
 set METHODS = "FT CS MDD coMDD"
+#setenv NCYCPLANESEND 0
 #set METHODS = "coMDD"
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
@@ -129,6 +131,7 @@ foreach METHOD ( $METHODS )
         end
     NLS_make_gnuplot_corr_all_awk.sh allplanes $METHOD $METHODLIST
     mkdir -p ${PROCESS}/${METHOD}
+    cp -f *${METHOD}.png ${PROCESS}
     mv -f *${METHOD}* ${PROCESS}/${METHOD}
 end
 

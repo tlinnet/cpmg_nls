@@ -64,14 +64,17 @@ set i=0
 foreach dir ( $procDirs )
     #echo "Killing all csh"
     #killall csh
+    sleep 10
     echo "   "$dir
     echo "In directory: $PWD"
     echo "setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log"
     setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log
     set ecode=$?
     echo "setHD succesfull? 0=yes, 1=no. Result= $ecode"
+    echo "In dir: $dir"
     if ( $ecode ) then
         echo Error while data disassembling
+        echo "coMDD fail: in $dir"
         exit($ecode)
     endif
     cd ../$dir

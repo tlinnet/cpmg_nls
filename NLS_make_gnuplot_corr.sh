@@ -25,9 +25,9 @@ set GNIMETHOD=`echo "$GNI" | cut -f3 -d"_"`
 cat > ${PLANE}_${GNINI}_${METHOD}.plt <<EOF
 set term postscript eps enhanced color "Helvetica" 14
 set title "Intensity correlation plot for method ${METHOD}\nIntensity normalized to maximum of ${GININI} ${GINIPLANE} ${GINIMETHOD}"
-set size ratio 0.3
-set xlabel "Intensity ${GININI} ${GINIPLANE} ${GINIMETHOD}"
-set ylabel "Intensity ${GNINI} ${GNIPLANE} ${GNIMETHOD}"
+set size ratio 0.618
+set xlabel "Intensity ni=${GININI} NCYC plane=${GINIPLANE} for ${GINIMETHOD}"
+set ylabel "Intensity ni=${GNINI} NCYC plane=${GNIPLANE} for ${GNIMETHOD}"
 #set ytics nomirror
 #set y2tics border
 #set y2label "F-test"
@@ -49,12 +49,12 @@ f_FIT_WSSR=FIT_WSSR
 f_WSSR_NDF=FIT_WSSR/FIT_NDF
 
 set label sprintf("f(x)=a*x") at graph 0.8,0.80 font "Helvetica,9"
-set label sprintf("a=%1.2f +- %1.4f",a,a_err) at graph 0.8,0.70 font "Helvetica,9"
-set label sprintf("b=%1.2f +- %1.4f",b,b_err) at graph 0.8,0.60 font "Helvetica,9"
-set label sprintf("NDF=%1.2f",f_FIT_NDF) at graph 0.8,0.50 font "Helvetica,9"
-set label sprintf("STDFIT=%1.2f",f_FIT_STDFIT) at graph 0.8,0.40 font "Helvetica,9"
-set label sprintf("WSSR=%1.2f",f_FIT_WSSR) at graph 0.8,0.30 font "Helvetica,9"
-set label sprintf("WSSR/NDF=%1.2f",f_WSSR_NDF) at graph 0.8,0.20 font "Helvetica,9"
+set label sprintf("a=%1.4f +- %1.5f",a,a_err) at graph 0.8,0.75 font "Helvetica,9"
+set label sprintf("b=%1.4f +- %1.5f",b,b_err) at graph 0.8,0.70 font "Helvetica,9"
+set label sprintf("NDF=%1.4f",f_FIT_NDF) at graph 0.8,0.65 font "Helvetica,9"
+set label sprintf("STDFIT=%1.7f",f_FIT_STDFIT) at graph 0.8,0.60 font "Helvetica,9"
+set label sprintf("WSSR=%1.7f",f_FIT_WSSR) at graph 0.8,0.55 font "Helvetica,9"
+set label sprintf("WSSR/NDF=%1.7f",f_WSSR_NDF) at graph 0.8,0.50 font "Helvetica,9"
 
 plot "<(sed -n '14,\${p}' ${PLANE}_${METHOD}.ser)" using (\$6*\$8 /${STATSMAX}):(\$6*\$$i /${STATSMAX}) title "${GNINI} ${GNIPLANE} ${GNIMETHOD}",\
 f(x) title "Correlation"
@@ -62,8 +62,8 @@ EOF
 
 gnuplot ${PLANE}_${GNINI}_${METHOD}.plt
 echo "Done with  ${PLANE}_${GNINI}_${METHOD}.eps"
-echo "Converting to png: eps2png -resolution 200 ${PLANE}_${GNINI}_${METHOD}.eps"
-eps2png -resolution 200 ${PLANE}_${GNINI}_${METHOD}.eps
+echo "Converting to png: eps2png -resolution 400 ${PLANE}_${GNINI}_${METHOD}.eps"
+eps2png -resolution 400 ${PLANE}_${GNINI}_${METHOD}.eps
 
 @ i++
 end

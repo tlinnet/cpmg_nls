@@ -20,13 +20,15 @@ sed -i "s/-yN.*/-yN          $yN \\/" fidSP.com
 sed -i "s/-yT.*/-yT          $NINLS \\/" fidSP.com
 #Add CS/MDD parameters
 sed  -i  '2{s/^/#Normal parameters\n/}' proc.sh
-sed  -i  '2{s/^/setenv CS_niter             10\n/}' proc.sh
+#sed  -i  '2{s/^/setenv CS_niter             10\n/}' proc.sh
+sed  -i  '2{s/^/setenv CS_niter             30\n/}' proc.sh
 sed  -i  '2{s/^/setenv CS_lambda            1.0\n/}' proc.sh
 sed  -i  '2{s/^/setenv CS_norm              0\n/}' proc.sh
 sed  -i  '2{s/^/setenv CS_alg               IRLS\n/}' proc.sh
 sed  -i  '2{s/^/#CS related parameters\n/}' proc.sh
 sed  -i  '2{s/^/setenv MDD_NOISE            0.7\n/}' proc.sh
-sed  -i  '2{s/^/setenv NITER                50\n/}' proc.sh
+#sed  -i  '2{s/^/setenv NITER                50\n/}' proc.sh
+sed  -i  '2{s/^/setenv NITER                500\n/}' proc.sh
 sed  -i  '2{s/^/setenv NCOMP                25\n/}' proc.sh
 sed  -i  '2{s/^/#MDD related parameters\n/}' proc.sh
 #FT
@@ -48,8 +50,6 @@ sed -i "/set ecode/d" proc.sh
 cp proc.sh proc1.sh
 sed -i "s/mddnmr4pipeN.sh.*/mddnmr4pipeN.sh 1 23/" proc.sh
 sed -i "s/mddnmr4pipeN.sh.*/mddnmr4pipeN.sh 4 5/" proc1.sh
-#sed -i "/mddnmr4pipeN.sh /{s/1 2 3 4 5/1 23/}" proc.sh
-#sed -i "/mddnmr4pipeN.sh /{s/1 2 3 4 5/4 5/}" proc1.sh
 #move nls.in and nls.hdr_3
 cp -f nls.in ../ft2_data/${NINLS}_${PLANE}_nls.in
 cp -f nls.hdr_3 ../ft2_data/${NINLS}_${PLANE}_nls.hdr_3

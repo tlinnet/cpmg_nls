@@ -20,14 +20,15 @@ cat > corr_coeff.awk <<EOF
 #http://people.sc.fsu.edu/~sshanbhag/awk-shell/linreg.awk
 #http://www.cyberciti.biz/faq/bash-scripting-using-awk/
 #http://en.wikipedia.org/wiki/Simple_linear_regression
-#awk -v max=1 '{print \$1, \$2*max}' testdataP225.txt | awk -f corr_coeff.awk
-BEGIN{}{ x[NR] = \$1; y[NR] = \$2;  sx += x[NR]; sy += y[NR]; sxx += x[NR]*x[NR]; sxy += x[NR]*y[NR]; syy += y[NR]*y[NR];}
+#awk -v max=1 '{print $1, $2*max}' testdataP225.txt | awk -f corr_coeff.awk
+BEGIN{}{ x[NR] = \$1; y[NR] = \$2;  sx += x[NR]; sy += y[NR]; sxx += x[NR]*x[NR]; sxy += x[NR]*y[NR]; syy += y[NR]*y[NR]; sresi += (x[NR]-y[NR])}
 END{ det = NR*sxx - sx*sx; a = (NR*sxy - sx*sy)/det; b = (-sx*sxy+sxx*sy)/det; r = (NR*sxy-sx*sy)/sqrt((NR*sxx-sx*sx)*(NR*syy-sy*sy));
 beta=(NR*sxy-sx*sy)/(NR*sxx-sx*sx); alpha=sy/NR-beta/NR*sx; se2=1/(NR*(NR-2))*(NR*syy-sy*sy-beta*beta*(NR*sxx-sx*sx)); sb2=(NR*se2)/(NR*sxx-sx*sx); sa2=sb2/NR*sxx;
 for(xi=1;xi<=NR;xi++){xsumsq+=((x[xi]-sx/NR)**2)} ; xvar=xsumsq/(NR); xstdev=sqrt(xvar);
-for(yi=1;yi<=NR;yi++){ysumsq+=((y[yi]-sy/NR)**2)} ; yvar=ysumsq/(NR); ystdev=sqrt(xvar);
-for(xi=1;xi<=NR;xi++){xysumsq+=((x[xi]-sx/NR)*(y[xi]-sy/NR))} ; xycovar=xysumsq/(NR)
-print "NR= "NR, "xvar= "xvar, "xstdev= "xstdev, "yvar= "yvar, "ystdev= "ystdev, "xycovar= "xycovar, "r= "r, "r2= "r*r, "a= " a, "b= "b
+for(yi=1;yi<=NR;yi++){ysumsq+=((y[yi]-sy/NR)**2)} ; yvar=ysumsq/(NR); ystdev=sqrt(yvar);
+for(yi=1;yi<=NR;yi++){resisumsq+=((x[yi]-y[yi]-sresi/NR)**2)} ; resivar=resisumsq/(NR); resistdev=sqrt(resivar);
+for(xi=1;xi<=NR;xi++){xysumsq+=((x[xi]-sx/NR)*(y[xi]-sy/NR))} ; xycovar=xysumsq/(NR);
+print "NR= "NR, "xvar= "xvar, "xstdev= "xstdev, "yvar= "yvar, "ystdev= "ystdev, "xycovar= "xycovar, "r= "r, "r2= "r*r, "a= " a, "b= "b, "resivar= "resivar, "resistdev= "resistdev
 #print "sx= "sx, "sy= "sy, "sxx= "sxx, "sxy= "sxy, "syy= "syy, "beta= "beta, "alpha= "alpha;
 #print "se2= "se2, "se= "sqrt(se2), "sb2= "sb2, "sb= "sqrt(sb2), "sa2= "sa2, "sa= "sqrt(sa2)
 }
@@ -48,24 +49,26 @@ end
 cat > ${PLANE}_${METHOD}.plt <<EOF
 set term postscript eps enhanced color "Helvetica" 14
 set title "Statistics plot for method ${METHOD}\nIntensity normalized to maximum of ${GININI} ${GINIPLANE} ${GINIMETHOD}"
-set size ratio 0.3
-set xlabel "NI ${GINIPLANE} ${GINIMETHOD}"
-set ylabel "Statistics coefficients\n${GNIPLANE} ${GNIMETHOD}"
+set size ratio 0.618
+set xlabel "Number of random ni out of ni_{max}"
+set ylabel "Correlation Coefficient R^2\nIntensity proportionality a, f(x)=a*x+b"
 set ytics nomirror
 set y2tics border
-set y2label "Correlation Coefficient\nCorrelation Slope a"
+set y2label "Residual stdev {/Symbol s}"
+#set y2label "Covariance {/Symbol s}_{xy}"
 set nokey
 #set key autotitle columnheader
 set key bottom
 #set xrange [128:0]
-#set yrange[0:1.1]
+set yrange[0:1.5]
+set y2range[0:0.1]
 #set xtics border in scale 1,0.5 mirror rotate by -90 font "Helvetica,5"
 #set ytics border in scale 1,0.5 mirror font "Helvetica,5"
 set output "${PLANE}_${METHOD}.eps"
 
 #set fit errorvariables
 #f(x)=a*x + b
-#fit f(x) "<(sed -n '14,\${p}' ${PLANE}_${METHOD}.ser)" using (\$6*\$8 /${STATSMAX}):(\$6*\$$i /${STATSMAX}) via a, b
+#fit f(x) "${PLANE}_${METHOD}.ser" using (\$6*\$8 /${STATSMAX}):(\$6*\$$i /${STATSMAX}) via a, b
 #f_FIT_NDF=FIT_NDF
 #f_FIT_STDFIT=FIT_STDFIT
 #f_FIT_WSSR=FIT_WSSR
@@ -79,10 +82,13 @@ set output "${PLANE}_${METHOD}.eps"
 #set label sprintf("WSSR=%1.2f",f_FIT_WSSR) at graph 0.8,0.30 font "Helvetica,9"
 #set label sprintf("WSSR/NDF=%1.2f",f_WSSR_NDF) at graph 0.8,0.20 font "Helvetica,9"
 
-plot "${PLANE}_${METHOD}.stats" using (\$1):(\$17) title "R^2",\
-"${PLANE}_${METHOD}.stats" using (\$1):(\$19) title "Correlation slope a",\
-"${PLANE}_${METHOD}.stats" using (\$1):(\$13) title "Y2: Covariance" axis x1y2
+plot "${PLANE}_${METHOD}.stats" using (\$1):(\$17) title "Correlation Coefficient R^2",\
+"${PLANE}_${METHOD}.stats" using (\$1):(\$19) title "Intensity proportionality a, f(x)=a*x+b",\
+"${PLANE}_${METHOD}.stats" using (\$1):(\$25) title "Y2: Residual stdev {/Symbol s}" axis x1y2
 #f(x) title "Correlation"
+
+#"${PLANE}_${METHOD}.stats" using (\$1):(\$13) title "Y2: Covariance {/Symbol s}_{xy}" axis x1y2,\
+
 EOF
 
 gnuplot ${PLANE}_${METHOD}.plt

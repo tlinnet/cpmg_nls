@@ -42,14 +42,14 @@ Then rerun your NLS_proc.sh with PROCESS=run_all
 EOF
 
 else if ( $PROCESS == "run_all") then
-#mv -n 0plane.proc/proc.sh . ; mv -n 0plane.proc/fidSP.com . ; mv -n 0plane.proc/recFT.com .
-#mkdir -p ft2_data
+mv -n 0plane.proc/proc.sh . ; mv -n 0plane.proc/fidSP.com . ; mv -n 0plane.proc/recFT.com .
+mkdir -p ft2_data
 
 foreach NLSNI (`seq 0 $NIINCR $NIEND`)
 setenv NINLS `expr $NI - $NLSNI`
 echo "Processing NI=${NINLS}"
-#NLS_mv_truncate_fid.sh
-#NLS_mv_qMDD_files.sh
+NLS_mv_truncate_fid.sh
+NLS_mv_qMDD_files.sh
 end
 
 endif
