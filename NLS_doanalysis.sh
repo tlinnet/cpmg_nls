@@ -1,9 +1,5 @@
 #!/bin/tcsh
 
-setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal.fid"
-#setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_CS30_MDD500.fid"
-
-#########################
 setenv SPARKYPEAKLIST sparky.list
 cd $CPMGFID
 setenv PROCPAR procpar
@@ -11,7 +7,6 @@ setenv PROCPARORI ${PROCPAR}_ori
 setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPARORI`
 setenv NCYCPLANESEND `expr $NCYCPLANES - 1`
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPARORI`
-#setenv NI 126
 setenv NIEND `expr $NI - 1`
 setenv FTDATA ft2_data
 #########################
