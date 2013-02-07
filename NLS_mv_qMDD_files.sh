@@ -19,31 +19,29 @@ sed -i "/setenv proc_out /{s/test.dat/test.ft2/}" proc.sh
 sed -i "s/-yN.*/-yN          $yN \\/" fidSP.com
 sed -i "s/-yT.*/-yT          $NINLS \\/" fidSP.com
 #Add CS/MDD parameters
-sed  -i  '2{s/^/#Normal parameters\n/}' proc.sh
-#sed  -i  '2{s/^/setenv CS_niter             10\n/}' proc.sh
-sed  -i  '2{s/^/setenv CS_niter             30\n/}' proc.sh
-sed  -i  '2{s/^/setenv CS_lambda            1.0\n/}' proc.sh
-sed  -i  '2{s/^/setenv CS_norm              0\n/}' proc.sh
-sed  -i  '2{s/^/setenv CS_alg               IRLS\n/}' proc.sh
-sed  -i  '2{s/^/#CS related parameters\n/}' proc.sh
-sed  -i  '2{s/^/setenv MDD_NOISE            0.7\n/}' proc.sh
-#sed  -i  '2{s/^/setenv NITER                50\n/}' proc.sh
-sed  -i  '2{s/^/setenv NITER                500\n/}' proc.sh
-sed  -i  '2{s/^/setenv NCOMP                25\n/}' proc.sh
-sed  -i  '2{s/^/#MDD related parameters\n/}' proc.sh
+sed  -i  "2{s/^/#Normal parameters\n/}" proc.sh
+sed  -i  "2{s/^/setenv CS_niter             ${CS_niter}\n/}" proc.sh
+sed  -i  "2{s/^/setenv CS_lambda            ${CS_lambda}\n/}" proc.sh
+sed  -i  "2{s/^/setenv CS_norm              ${CS_norm}\n/}" proc.sh
+sed  -i  "2{s/^/setenv CS_alg               ${CS_alg}\n/}" proc.sh
+sed  -i  "2{s/^/#CS related parameters\n/}" proc.sh
+sed  -i  "2{s/^/setenv MDD_NOISE            ${MDD_NOISE}\n/}" proc.sh
+sed  -i  "2{s/^/setenv NITER                ${NITER}\n/}" proc.sh
+sed  -i  "2{s/^/setenv NCOMP                ${NCOMP}\n/}" proc.sh
+sed  -i  "2{s/^/#MDD related parameters\n/}" proc.sh
 #FT
 ./proc.sh
-mv -f test.ft2 ../ft2_data/${NINLS}_${PLANE}_FT.ft2
+mv -f test.ft2 ../$FTDATA/${NINLS}_${PLANE}_FT.ft2
 echo "Done with: ${NINLS}_${PLANE}_FT.ft2"
 #CS
 sed -i "/setenv METHOD/{s/FT/CS/}" proc.sh
 ./proc.sh
-mv -f test.ft2 ../ft2_data/${NINLS}_${PLANE}_CS.ft2
+mv -f test.ft2 ../$FTDATA/${NINLS}_${PLANE}_CS.ft2
 echo "Done with: ${NINLS}_${PLANE}_CS.ft2"
 #MDD
 sed -i "/setenv METHOD/{s/CS/MDD/}" proc.sh
 ./proc.sh
-mv -f test.ft2 ../ft2_data/${NINLS}_${PLANE}_MDD.ft2
+mv -f test.ft2 ../$FTDATA/${NINLS}_${PLANE}_MDD.ft2
 echo "Done with: ${NINLS}_${PLANE}_MDD.ft2"
 #coMDD make ready
 sed -i "/set ecode/d" proc.sh
@@ -51,8 +49,8 @@ cp proc.sh proc1.sh
 sed -i "s/mddnmr4pipeN.sh.*/mddnmr4pipeN.sh 1 23/" proc.sh
 sed -i "s/mddnmr4pipeN.sh.*/mddnmr4pipeN.sh 4 5/" proc1.sh
 #move nls.in and nls.hdr_3
-cp -f nls.in ../ft2_data/${NINLS}_${PLANE}_nls.in
-cp -f nls.hdr_3 ../ft2_data/${NINLS}_${PLANE}_nls.hdr_3
+cp -f nls.in ../$FTDATA/${NINLS}_${PLANE}_nls.in
+cp -f nls.hdr_3 ../$FTDATA/${NINLS}_${PLANE}_nls.hdr_3
 cd ..
 end
 
@@ -68,12 +66,11 @@ cd ..
 echo "Running coMDD in $PWD"
 set COMDDDIRS=`ls -dtr *.proc`
 echo "Parsing coMDD dirs: $COMDDDIRS"
-#NLS_coproc.sh c $COMDDDIRS >>&coMDD.log
 NLS_coproc.sh c $COMDDDIRS
 
 # Move coMDD results
 foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
 cd ${PLANE}plane.proc
-mv -f test.ft2 ../ft2_data/${NINLS}_${PLANE}_coMDD.ft2
+mv -f test.ft2 ../$FTDATA/${NINLS}_${PLANE}_coMDD.ft2
 cd ..
 end

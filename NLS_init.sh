@@ -6,14 +6,17 @@ exit
 endif
 
 cd $CPMGFID
+setenv PROCESS $1
 setenv PROCPAR procpar
 setenv PROCPARORI ${PROCPAR}_ori
 setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPAR`
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPAR`
 setenv NIEND `expr $NI - 1`
+setenv NIEND `expr 4 - 1`
 setenv NP `awk '/^np /{f=1;next}f{print $2;exit}' $PROCPAR`
 setenv sw1 `sed -n "/sw1 /{n;p}" $PROCPAR | awk '{print $2}'`
 setenv sw `sed -n "/sw /{n;p}" $PROCPAR | awk '{print $2}'`
+setenv FTDATA ft2_data
 
 if ( $PROCESS == "init") then
 cp -pn $PROCPAR $PROCPARORI
@@ -23,7 +26,6 @@ setenv NINLS $NI
 NLS_init_nls.sh
 NLS_mv_truncate_fid.sh
 
-#qMDD nogui 0plane.fid --METHOD FT --mddargs FST_PNT_PPM 11 ROISW 5 proc_out test.ft2 MDDTHREADS 22
 qMDD 0plane.fid  
 cat << EOF
 ##########################
@@ -43,7 +45,7 @@ EOF
 
 else if ( $PROCESS == "run_all") then
 mv -n 0plane.proc/proc.sh . ; mv -n 0plane.proc/fidSP.com . ; mv -n 0plane.proc/recFT.com .
-mkdir -p ft2_data
+mkdir -p $FTDATA
 
 foreach NLSNI (`seq 0 $NIINCR $NIEND`)
 setenv NINLS `expr $NI - $NLSNI`

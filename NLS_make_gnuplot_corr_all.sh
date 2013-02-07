@@ -34,8 +34,8 @@ set ylabel "Intensity ni=${GNINI} NCYC plane=${GNIPLANE} for ${GNIMETHOD}"
 set nokey
 #set key autotitle columnheader
 #set key outside right
-set xrange [0:]
-set yrange[0:]
+set xrange [0:1]
+set yrange[0:1]
 #set xtics border in scale 1,0.5 mirror rotate by -90 font "Helvetica,5"
 #set ytics border in scale 1,0.5 mirror font "Helvetica,5"
 set output "${PLANE}_${GNINI}_${METHOD}.eps"

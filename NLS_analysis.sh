@@ -1,12 +1,11 @@
 #!/bin/tcsh
 
-# /sbinlab2/tlinnet/Desktop/Link to CPMG_data_test/kte/080716_cpmgDisp_HEWLpH65.fid
-setenv CPMGFID "/net/haddock/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65.fid"
-setenv NIINCR 2
-setenv ANADIR $CPMGFID/ft2_data/analysis
+setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65.fid"
+#setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_CS30_MDD500.fid"
+
+#########################
 setenv SPARKYPEAKLIST sparky.list
 cd $CPMGFID
-
 setenv PROCPAR procpar
 setenv PROCPARORI ${PROCPAR}_ori
 setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPARORI`
@@ -14,35 +13,44 @@ setenv NCYCPLANESEND `expr $NCYCPLANES - 1`
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPARORI`
 #setenv NI 126
 setenv NIEND `expr $NI - 1`
-setenv NP `awk '/^np /{f=1;next}f{print $2;exit}' $PROCPARORI`
-
+setenv FTDATA ft2_data
+#########################
+set COMPARETO='FT'
+#set COMPARETO='self'
+setenv ANADIR $CPMGFID/analysis_$COMPARETO
 mkdir -p $ANADIR
 cd $ANADIR
 echo "working in $PWD"
 cp -n $CPMGFID/$SPARKYPEAKLIST .
 echo "Making peaks.dat"
-echo "NLS_stPeakList.pl ../128_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat\n"
-NLS_stPeakList.pl ../128_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat
-
-
-#set PROCESS="int_resi"
-#set PROCESS="int_corr_ft_method"
-#set PROCESS="int_corr_ft_method_all"
-set PROCESS="int_corr_ft_method_all_awk"
-
-if ( $PROCESS == "int_resi") then
+echo "NLS_stPeakList.pl $CPMGFID/$FTDATA/${NI}_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat\n"
+NLS_stPeakList.pl $CPMGFID/$FTDATA/${NI}_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat
+###############################
+set PROCESSES="int_corr_ft_method_all_awk_full" 
+#set PROCESSES="int_resi int_corr_ft_method int_corr_ft_method_all int_corr_ft_method_all_awk int_corr_ft_method_all_awk_full" 
 set METHODS = "FT CS MDD coMDD"
-#set METHODS = "coMDD"
+set METHODS = "coMDD"
+#set METHODS = "FT"
 #setenv NCYCPLANESEND 1
+
+###############################
+
+foreach PROCESS ( $PROCESSES )
+if ( $PROCESS == "int_resi") then
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
-        set METHODLIST="${NI}_${PLANE}_FT " 
-        set METHODFILES=`ls -tr ../*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        if ( $COMPARETO == 'FT') then
+            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            set METHODLIST="${NI}_${PLANE}_FT " 
+        else
+            echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
+            set METHODLIST=`basename $METHODFILES[1] | cut -f1 -d"."`
+        endif
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
-            set METHODTEMP=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2-`
-            set METHODLIST="${METHODLIST} $METHODTEMP " 
+            set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
+            set METHODLIST="${METHODLIST} $METHODTEMP "
         end
         seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
         NLS_make_gnuplot.sh $PLANE $METHOD $METHODLIST
@@ -52,17 +60,19 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method") then
-set METHODS = "FT CS MDD coMDD"
-#set METHODS = "coMDD"
-#setenv NCYCPLANESEND 0
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
-        set METHODLIST="${NI}_${PLANE}_FT " 
-        set METHODFILES=`ls -tr ../*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        if ( $COMPARETO == 'FT') then
+            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            set METHODLIST="${NI}_${PLANE}_FT " 
+        else
+            echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
+            set METHODLIST=`basename $METHODFILES[1] | cut -f1 -d"."`
+        endif
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
-            set METHODTEMP=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2-`
+            set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
             set METHODLIST="${METHODLIST} $METHODTEMP " 
         end
         seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
@@ -74,13 +84,14 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method_all") then
-set METHODS = "FT CS MDD coMDD"
-#setenv NCYCPLANESEND 0
-#set METHODS = "coMDD"
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
-        set METHODFILES=`ls -tr ../*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        if ( $COMPARETO == 'FT') then
+            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+        else
+            echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
+        endif
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
         end
@@ -90,13 +101,16 @@ foreach METHOD ( $METHODS )
         cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
         rm ${PLANE}_${METHOD}.list
     end
-    set METHODLIST="${NI}_allplanes_FT " 
-    set METHODFILES=`ls -tr ../*_0_${METHOD}.ft2`
+    if ( $COMPARETO == 'FT') then
+        set METHODLIST="${NI}_allplanes_FT " 
+    else
+        set METHODLIST="${NI}_allplanes_${METHOD} " 
+    endif
+    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
-            set METHODTEMP1=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2- | cut -f1 -d"_"`
-            set METHODTEMP2=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2- | cut -f3 -d"_"`
-            set METHODLIST="${METHODLIST} ${METHODTEMP1}_allplanes_${METHODTEMP2} " 
+            set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
+            set METHODLIST="${METHODLIST} ${METHODTEMP} " 
         end
     NLS_make_gnuplot_corr_all.sh allplanes $METHOD $METHODLIST
     mkdir -p ${PROCESS}/${METHOD}
@@ -105,13 +119,14 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk") then
-set METHODS = "FT CS MDD coMDD"
-#setenv NCYCPLANESEND 0
-#set METHODS = "coMDD"
 foreach METHOD ( $METHODS )
     foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        echo "../${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
-        set METHODFILES=`ls -tr ../*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        if ( $COMPARETO == 'FT') then
+            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+        else
+            echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
+        endif
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
         end
@@ -121,12 +136,16 @@ foreach METHOD ( $METHODS )
         cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
         rm ${PLANE}_${METHOD}.list
     end
-    set METHODLIST="${NI}_allplanes_FT " 
-    set METHODFILES=`ls -tr ../*_0_${METHOD}.ft2`
+    if ( $COMPARETO == 'FT') then
+        set METHODLIST="${NI}_allplanes_FT " 
+    else
+        set METHODLIST="${NI}_allplanes_${METHOD} " 
+    endif
+    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
-            set METHODTEMP1=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2- | cut -f1 -d"_"`
-            set METHODTEMP2=`echo "$METHODFILE" | cut -f3 -d"." | cut -c2- | cut -f3 -d"_"`
+            set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
+            set METHODTEMP2=`basename "$METHODFILE" | cut -f3 -d"_" | cut -f1 -d"."`
             set METHODLIST="${METHODLIST} ${METHODTEMP1}_allplanes_${METHODTEMP2} " 
         end
     NLS_make_gnuplot_corr_all_awk.sh allplanes $METHOD $METHODLIST
@@ -135,6 +154,40 @@ foreach METHOD ( $METHODS )
     mv -f *${METHOD}* ${PROCESS}/${METHOD}
 end
 
-else
-
+else if ( $PROCESS == "int_corr_ft_method_all_awk_full") then
+foreach METHOD ( $METHODS )
+    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
+        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        if ( $COMPARETO == 'FT') then
+            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+        else
+            echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
+        endif
+        foreach METHODFILE ( $METHODFILES )
+            echo $METHODFILE >> ${PLANE}_${METHOD}.list
+        end
+        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        sed -n '14,${p}' ${PLANE}_${METHOD}.ser >> allplanes_${METHOD}.ser
+        rm ${PLANE}_${METHOD}.ser
+        cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
+        rm ${PLANE}_${METHOD}.list
+    end
+    if ( $COMPARETO == 'FT') then
+        set METHODLIST="${NI}_allplanes_FT " 
+    else
+        set METHODLIST="${NI}_allplanes_${METHOD} " 
+    endif
+    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
+        foreach METHODFILE ( $METHODFILES )
+            echo $METHODFILE >> ${PLANE}_${METHOD}.list
+            set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
+            set METHODTEMP2=`basename "$METHODFILE" | cut -f3 -d"_" | cut -f1 -d"."`
+            set METHODLIST="${METHODLIST} ${METHODTEMP1}_allplanes_${METHODTEMP2} " 
+        end
+    NLS_make_gnuplot_corr_all_awk_full.sh allplanes $METHOD $METHODLIST
+    mkdir -p ${PROCESS}/${METHOD}
+    cp -f *${METHOD}.png ${PROCESS}
+    mv -f *${METHOD}* ${PROCESS}/${METHOD}
+end
 endif
+end

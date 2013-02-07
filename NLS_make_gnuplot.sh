@@ -19,7 +19,7 @@ set ylabel "Intensity proportionality\nni/ni_{max}"
 #set y2label "F-test"
 set nokey
 #set key autotitle columnheader
-set key outside right
+set key outside right font "Helvetica,5"
 #set xrange [0.1:MAXX]
 ##set xrange[0.5:NRLINES-0.5]
 ##set xtics 1
