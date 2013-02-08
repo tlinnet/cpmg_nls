@@ -18,7 +18,7 @@ setenv NIINCR 2
 ############### cpmgDisp_HEWLpH65 #############################
 # PROCESS=init for initialization and stopping at 0plane.fid and phase, or PROCESS=run_all
 setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal.fid"
-setenv NUSRANDOM "n"
+setenv NUSRANDOM "y"
 #NLS_init.sh init
 NLS_init.sh run_all >> $CPMGFID/logfile.log
 

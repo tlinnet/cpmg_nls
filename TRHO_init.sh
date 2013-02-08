@@ -5,11 +5,22 @@ echo "You have to run on haddock"
 exit
 endif
 
-cd $CPMGFID
+cd $TRHOFIDS
+set EXPFILES=`ls -vd $TRHOFIDS/*.fid`
+setenv EXPFILESNR ${#EXPFILES}
+#setenv EXPFILESNR 2
+set EXPRANGE = ""
+foreach I (`seq 1 1 $EXPFILESNR`)
+    set EXPTEMP=`basename "$EXPFILES[$I]"`
+    set EXPRANGE="${EXPRANGE} $EXPTEMP "
+end
+
 setenv PROCESS $1
 setenv PROCPAR procpar
 setenv PROCPARORI ${PROCPAR}_ori
-setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPAR`
+setenv EXPINI $EXPFILES[1]
+echo "expini: $EXPINI"
+cp -pn $EXPINI/$PROCPAR $TRHOFIDS/$PROCPAR
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPAR`
 setenv NIEND `expr $NI - 1`
 setenv NP `awk '/^np /{f=1;next}f{print $2;exit}' $PROCPAR`
@@ -19,13 +30,11 @@ setenv FTDATA ft2_data
 
 if ( $PROCESS == "init") then
 cp -pn $PROCPAR $PROCPARORI
-NLS_init_fid.sh
-
 setenv NINLS $NI
 NLS_init_nls.sh
-NLS_mv_truncate_fid.sh
+TRHO_mv_truncate_fid.sh $EXPRANGE
 
-qMDD 0plane.fid  
+qMDD22 $EXPINI  
 cat << EOF
 ##########################
 1) Now phase your spectrum for the 0plane.
@@ -43,14 +52,16 @@ Then rerun your NLS_proc.sh with PROCESS=run_all
 EOF
 
 else if ( $PROCESS == "run_all") then
-mv -n 0plane.proc/proc.sh . ; mv -n 0plane.proc/fidSP.com . ; mv -n 0plane.proc/recFT.com .
+set EXPINIDIR=`echo $EXPINI | cut -d'.' -f1`
+mv -n ${EXPINIDIR}.proc/proc.sh . ; mv -n ${EXPINIDIR}.proc/fidSP.com . ; mv -n ${EXPINIDIR}.proc/recFT.com .
 mkdir -p $FTDATA
 
 foreach NLSNI (`seq 0 $NIINCR $NIEND`)
 setenv NINLS `expr $NI - $NLSNI`
 echo "Processing NI=${NINLS}"
-NLS_mv_truncate_fid.sh
-NLS_mv_qMDD_files.sh
+TRHO_mv_truncate_fid.sh $EXPRANGE
+TRHO_mv_qMDD_files.sh $EXPRANGE
 end
+
 
 endif
