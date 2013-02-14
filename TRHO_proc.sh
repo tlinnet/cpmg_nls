@@ -26,3 +26,17 @@ TRHO_init.sh run_all >> $TRHOFIDS/logfile.log
 setenv TRHOFIDS "/home/tlinnet/kte/t1rho/bblM_20130104_pH6_5C_0Murea_NoRandom"
 setenv NUSRANDOM "n"
 TRHO_init.sh run_all >> $TRHOFIDS/logfile.log
+
+#Running for CS30 and MDD500
+setenv TRHOFIDS "/home/tlinnet/kte/t1rho/bblM_20130104_pH6_5C_0Murea_CS30_MDD500"
+setenv NUSRANDOM "y"
+setenv CS_niter 30
+setenv NITER 500
+#NLS_init.sh run_all >> $TRHOFIDS/logfile.log
+
+#Running for CS100 and MDD500
+setenv TRHOFIDS "/home/tlinnet/kte/t1rho/bblM_20130104_pH6_5C_0Murea_CS100_MDD500"
+setenv NUSRANDOM "y"
+setenv CS_niter 100
+setenv NITER 500
+#NLS_init.sh run_all >> $TRHOFIDS/logfile.log

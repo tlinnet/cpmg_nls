@@ -1,41 +1,50 @@
 #!/bin/tcsh
 
-cd $CPMGFID
+cd $TRHOFIDS
 setenv PROCPAR procpar
 setenv PROCPARORI ${PROCPAR}_ori
-setenv NCYCPLANES `awk '/^ncyc /{f=1;next}f{print $1;exit}' $PROCPARORI`
-setenv NCYCPLANESEND `expr $NCYCPLANES - 1`
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPARORI`
 setenv NIEND `expr $NI - 1`
 setenv FTDATA ft2_data
 #########################
+set EXPFILES=`ls -vd $TRHOFIDS/*.fid`
+setenv EXPFILESNR ${#EXPFILES}
+#setenv EXPFILESNR 4
+set EXPRANGE = ""
+foreach I (`seq 1 1 $EXPFILESNR`)
+    set EXPTEMP=`basename "$EXPFILES[$I]" | sed 's/\(.*\)\..*/\1/'`
+    set EXPRANGE="${EXPRANGE} $EXPTEMP "
+end
+set EXPRANGE=( $EXPRANGE )
+setenv EXPINI $EXPRANGE[1]
+#########################
 set COMPARETO='FT'
-#set COMPARETO='self'
-setenv ANADIR $CPMGFID/analysis_$COMPARETO
+###set COMPARETO='self'
+setenv ANADIR $TRHOFIDS/analysis_$COMPARETO
 mkdir -p $ANADIR
 cd $ANADIR
 echo "working in $PWD"
-cp -n $CPMGFID/$SPARKYPEAKLIST .
+cp -n $TRHOFIDS/$SPARKYPEAKLIST .
 echo "Making peaks.dat"
-echo "NLS_stPeakList.pl $CPMGFID/$FTDATA/${NI}_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat\n"
-NLS_stPeakList.pl $CPMGFID/$FTDATA/${NI}_0_FT.ft2 $SPARKYPEAKLIST > peaks.dat
+echo "NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 $SPARKYPEAKLIST > peaks.dat\n"
+NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 $SPARKYPEAKLIST > peaks.dat
 ###############################
+#set PROCESSES="int_corr_ft_method_all_awk_full"
 set PROCESSES="int_corr_ft_method_all int_corr_ft_method_all_awk int_corr_ft_method_all_awk_full" 
 #set PROCESSES="int_resi int_corr_ft_method int_corr_ft_method_all int_corr_ft_method_all_awk int_corr_ft_method_all_awk_full" 
 set METHODS = "FT CS MDD coMDD"
-#set METHODS = "coMDD"
-#set METHODS = "FT"
-#setenv NCYCPLANESEND 1
+##set METHODS = "FT"
+##setenv NCYCPLANESEND 1
 
 ###############################
 
 foreach PROCESS ( $PROCESSES )
 if ( $PROCESS == "int_resi") then
 foreach METHOD ( $METHODS )
-    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+    foreach PLANE ( $EXPRANGE )
+        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
-            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
             set METHODLIST="${NI}_${PLANE}_FT " 
         else
             echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
@@ -55,10 +64,10 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method") then
 foreach METHOD ( $METHODS )
-    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+    foreach PLANE ( $EXPRANGE )
+        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
-            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
             set METHODLIST="${NI}_${PLANE}_FT " 
         else
             echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
@@ -79,10 +88,10 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all") then
 foreach METHOD ( $METHODS )
-    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+    foreach PLANE ( $EXPRANGE )
+        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
-            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
             echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
         endif
@@ -100,7 +109,7 @@ foreach METHOD ( $METHODS )
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
+    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
@@ -114,10 +123,10 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk") then
 foreach METHOD ( $METHODS )
-    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+    foreach PLANE ( $EXPRANGE )
+        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
-            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
             echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
         endif
@@ -135,7 +144,7 @@ foreach METHOD ( $METHODS )
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
+    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
@@ -150,10 +159,10 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk_full") then
 foreach METHOD ( $METHODS )
-    foreach PLANE (`seq 0 1 $NCYCPLANESEND`)
-        set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+    foreach PLANE ( $EXPRANGE )
+        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
-            echo "$CPMGFID/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
+            echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
             echo $METHODFILES[1] > ${PLANE}_${METHOD}.list
         endif
@@ -171,7 +180,7 @@ foreach METHOD ( $METHODS )
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $CPMGFID/$FTDATA/*_0_${METHOD}.ft2`
+    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
@@ -185,3 +194,4 @@ foreach METHOD ( $METHODS )
 end
 endif
 end
+
