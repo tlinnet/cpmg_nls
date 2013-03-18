@@ -7,7 +7,7 @@ set t='"'
 if ($#argv < 5) then
     echo "Make statistics from a two column file"
     echo "Usage: $0 file" "'"'$X'"'" "'"'$Y'"' XRATIO YRATIO"
-    echo "./awk_two_column.sh testdata_wiki.txt" "'"'$1'"'" "'"'$2'"' XRATIO YRATIO 'all'"
+    echo "awk_two_column.sh testdata_wiki.txt" "'"'$1'"'" "'"'$2'"' XRATIO YRATIO 'all'"
     goto done
 endif
 

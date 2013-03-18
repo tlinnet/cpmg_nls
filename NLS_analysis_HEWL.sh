@@ -12,9 +12,9 @@ setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal_CS30_MDD500.fi
 #NLS_doanalysis.sh
 #Running for CS30 and MDD500 for NoRandom schedule
 setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal_CS30_MDD500_NoRandom.fid"
-NLS_doanalysis.sh
+#NLS_doanalysis.sh
 
 #Running for CS100 and MDD500 for NoRandom schedule
-#setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal_CS100_MDD500.fid"
-#NLS_doanalysis.sh
+setenv CPMGFID "/home/tlinnet/kte/080716_cpmgDisp_HEWLpH65_normal_CS100_MDD500.fid"
+NLS_doanalysis.sh
 ###############
