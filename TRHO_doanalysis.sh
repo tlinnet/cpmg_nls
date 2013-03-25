@@ -6,6 +6,7 @@ setenv PROCPARORI ${PROCPAR}_ori
 setenv NI `awk '/^ni /{f=1;next}f{print $2;exit}' $PROCPARORI`
 setenv NIEND `expr $NI - 1`
 setenv FTDATA ft2_data
+set SPARKYPEAKLISTS=`awk '{print $1}' $SPARKYPEAKLISTFILES`
 #########################
 set EXPFILES=`ls -vd $TRHOFIDS/*.fid`
 setenv EXPFILESNR ${#EXPFILES}
@@ -16,6 +17,7 @@ foreach I (`seq 1 1 $EXPFILESNR`)
     set EXPRANGE="${EXPRANGE} $EXPTEMP "
 end
 set EXPRANGE=( $EXPRANGE )
+#echo $EXPRANGE
 setenv EXPINI $EXPRANGE[1]
 #########################
 set COMPARETO='FT'
@@ -24,16 +26,21 @@ setenv ANADIR $TRHOFIDS/analysis_$COMPARETO
 mkdir -p $ANADIR
 cd $ANADIR
 echo "working in $PWD"
-cp -n $TRHOFIDS/$SPARKYPEAKLIST .
-echo "Making peaks.dat"
-echo "NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 $SPARKYPEAKLIST > peaks.dat\n"
-NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 $SPARKYPEAKLIST > peaks.dat
+
+set i=1
+foreach SPARKYPEAKLIST ( $SPARKYPEAKLISTS )
+    cp -n $TRHOFIDS/${SPARKYPEAKLIST} .
+    echo "Making peaks.dat"
+    echo "NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 ${SPARKYPEAKLIST} > peaks.dat${i}\n"
+    NLS_stPeakList.pl $TRHOFIDS/$FTDATA/${NI}_${EXPINI}_FT.ft2 ${SPARKYPEAKLIST} > peaks.dat${i}
+    @ i++
+end
 ###############################
 #set PROCESSES="int_corr_ft_method_all_awk_full"
 set PROCESSES="int_corr_ft_method_all int_corr_ft_method_all_awk int_corr_ft_method_all_awk_full" 
 #set PROCESSES="int_resi int_corr_ft_method int_corr_ft_method_all int_corr_ft_method_all_awk int_corr_ft_method_all_awk_full" 
 set METHODS = "FT CS MDD coMDD"
-##set METHODS = "FT"
+#set METHODS = "CS"
 ##setenv NCYCPLANESEND 1
 
 ###############################
@@ -41,8 +48,9 @@ set METHODS = "FT CS MDD coMDD"
 foreach PROCESS ( $PROCESSES )
 if ( $PROCESS == "int_resi") then
 foreach METHOD ( $METHODS )
+    set i=1
     foreach PLANE ( $EXPRANGE )
-        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
             echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
             set METHODLIST="${NI}_${PLANE}_FT " 
@@ -55,7 +63,8 @@ foreach METHOD ( $METHODS )
             set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
             set METHODLIST="${METHODLIST} $METHODTEMP "
         end
-        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        seriesTab -in peaks.dat${i} -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        @ i++
         NLS_make_gnuplot.sh $PLANE $METHOD $METHODLIST
     end
     mkdir -p ${PROCESS}/${METHOD}
@@ -64,8 +73,9 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method") then
 foreach METHOD ( $METHODS )
+    set i=1
     foreach PLANE ( $EXPRANGE )
-        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
             echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
             set METHODLIST="${NI}_${PLANE}_FT " 
@@ -78,7 +88,8 @@ foreach METHOD ( $METHODS )
             set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
             set METHODLIST="${METHODLIST} $METHODTEMP " 
         end
-        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        seriesTab -in peaks.dat${i} -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        @ i++
         NLS_make_gnuplot_corr.sh $PLANE $METHOD $METHODLIST
     end
     mkdir -p ${PROCESS}/${METHOD}
@@ -88,8 +99,9 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all") then
 foreach METHOD ( $METHODS )
+    set i=1
     foreach PLANE ( $EXPRANGE )
-        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
             echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
@@ -98,18 +110,19 @@ foreach METHOD ( $METHODS )
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
         end
-        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        seriesTab -in peaks.dat${i} -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
         sed -n '14,${p}' ${PLANE}_${METHOD}.ser >> allplanes_${METHOD}.ser
         rm ${PLANE}_${METHOD}.ser
         cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
         rm ${PLANE}_${METHOD}.list
+        @ i++
     end
     if ( $COMPARETO == 'FT') then
         set METHODLIST="${NI}_allplanes_FT " 
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
+    set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP=`basename "$METHODFILE" | cut -f1 -d"."`
@@ -123,8 +136,9 @@ end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk") then
 foreach METHOD ( $METHODS )
+    set i=1
     foreach PLANE ( $EXPRANGE )
-        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
             echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
@@ -133,18 +147,19 @@ foreach METHOD ( $METHODS )
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
         end
-        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        seriesTab -in peaks.dat${i} -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
         sed -n '14,${p}' ${PLANE}_${METHOD}.ser >> allplanes_${METHOD}.ser
         rm ${PLANE}_${METHOD}.ser
         cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
         rm ${PLANE}_${METHOD}.list
+        @ i++
     end
     if ( $COMPARETO == 'FT') then
         set METHODLIST="${NI}_allplanes_FT " 
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
+    set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
@@ -158,9 +173,11 @@ foreach METHOD ( $METHODS )
 end
 
 else if ( $PROCESS == "int_corr_ft_method_all_awk_full") then
+set i=1
 foreach METHOD ( $METHODS )
+    set i=1
     foreach PLANE ( $EXPRANGE )
-        set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
+        set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${PLANE}_${METHOD}.ft2`
         if ( $COMPARETO == 'FT') then
             echo "$TRHOFIDS/$FTDATA/${NI}_${PLANE}_FT.ft2" > ${PLANE}_${METHOD}.list
         else
@@ -169,18 +186,19 @@ foreach METHOD ( $METHODS )
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
         end
-        seriesTab -in peaks.dat -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
+        seriesTab -in peaks.dat${i} -out ${PLANE}_${METHOD}.ser -list ${PLANE}_${METHOD}.list -sum -dx 1 -dy 1
         sed -n '14,${p}' ${PLANE}_${METHOD}.ser >> allplanes_${METHOD}.ser
         rm ${PLANE}_${METHOD}.ser
         cat ${PLANE}_${METHOD}.list >> allplanes_${METHOD}.list
         rm ${PLANE}_${METHOD}.list
+        @ i++
     end
     if ( $COMPARETO == 'FT') then
         set METHODLIST="${NI}_allplanes_FT " 
     else
         set METHODLIST="${NI}_allplanes_${METHOD} " 
     endif
-    set METHODFILES=`ls -tr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
+    set METHODFILES=`ls -vr $TRHOFIDS/$FTDATA/*_${EXPINI}_${METHOD}.ft2`
         foreach METHODFILE ( $METHODFILES )
             echo $METHODFILE >> ${PLANE}_${METHOD}.list
             set METHODTEMP1=`basename "$METHODFILE" | cut -f1 -d"_"`
