@@ -1,0 +1,15 @@
+decay_dpwr2slock_46_deltadof2_0.fit 0 1903.4
+decay_dpwr2slock_46_deltadof2_2000.fit 2000 1903.4
+decay_dpwr2slock_46_deltadof2_500.fit 500 1903.4
+decay_dpwr2slock_46_deltadof2_5000.fit 5000 1903.4
+decay_dpwr2slock_46_deltadof2_1000.fit 1000 1903.4
+decay_dpwr2slock_46_deltadof2_20000.fit 20000 1903.4
+decay_dpwr2slock_43_deltadof2_0.fit 0 1379.5
+decay_dpwr2slock_39_deltadof2_0.fit 0 898.1
+decay_dpwr2slock_41_deltadof2_0.fit 0 1113.1
+decay_dpwr2slock_41_deltadof2_1000.fit 1000 1113.1
+decay_dpwr2slock_41_deltadof2_2000.fit 2000 1113.1
+decay_dpwr2slock_43_deltadof2_1000.fit 1000 1379.5
+decay_dpwr2slock_39_deltadof2_2000.fit 2000 898.1
+decay_dpwr2slock_39_deltadof2_1000.fit 1000 898.1
+decay_dpwr2slock_43_deltadof2_2000.fit 2000 1379.5
