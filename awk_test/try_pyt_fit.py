@@ -3,29 +3,35 @@ from scipy import optimize
 
 def fitfunc(x,a,b):
     return a*x + b # Target function
-def errfunc(p, x, y):
+def errfitfunc(p, x, y):
     return fitfunc(x,*p) - y # Distance to the target function
 
 dat = genfromtxt('testdataP225.txt')
 datX = dat[:,0]
 datY = dat[:,1]
-print datX
+pguess = (2.0, 2.0)
 
-p = (2.0, 2.0) 
-pa_lea,suc = optimize.leastsq(errfunc, p, args=(datX, datY))
-print suc
-fitYlea = fitfunc(datX,*pa_lea)
+lea = {}
+lea['par'], lea['cov_x'], lea['infodict'], lea['mesg'], lea['ier'] = optimize.leastsq(errfitfunc, pguess, args=(datX, datY), full_output=1)
+print lea['par'], lea['ier']
+datY_lea = fitfunc(datX,*lea['par'])
 
-pa_cur, pcov = optimize.curve_fit(fitfunc, datX, datY,p0=p)
-print pcov
-fitYcur = fitfunc(datX,*pa_cur)
-variance = diagonal(pcov) #Refer [3]
-StdErr = sqrt(variance)
-print StdErr
+cur = {}
+cur['par'], cur['pcov'], cur['infodict'], cur['mesg'], cur['ier'] = optimize.curve_fit(fitfunc, datX, datY, p0=pguess, full_output=1)
+print datX, type(datX)
+datY_cur=fitfunc(datX,*cur['par'])
+cur['par_variance'] = diagonal(cur['pcov']); cur['par_stderr'] = sqrt(cur['par_variance'])
+# Read this: http://mail.scipy.org/pipermail/scipy-user/2009-March/020516.html
+cur['chisq']=sum(cur['infodict']['fvec']*cur['infodict']['fvec']) # calculate final chi square
+cur['NDF']=len(datY)-len(cur['par'])
+cur['RMS_residuals'] = sqrt(cur['chisq']/cur['NDF'])
+print cur['par'], cur['ier'], cur['chisq']
 
-plot(datX, datY, "o",label='data') # Plot of the data
-plot(datX, fitYlea, ".-",label='least') # Plot of the data
-plot(datX, fitYcur, ".-",label='cur') # Plot of the data
+subplot(2,1,1)
+plot(datX,datY,"o",label='data')
+plot(datX,datY_lea, ".-",label='least')
 legend(loc="upper left")
-
+subplot(2,1,2)
+plot(datX,datY,"o",label='data')
+plot(datX,datY_cur, ".-",label='cur')
 show()
