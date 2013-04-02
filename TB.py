@@ -1,6 +1,7 @@
 from pylab import *
 import numpy
 import scipy.optimize
+import scipy.stats.distributions
 import os
 
 figsize = 16
@@ -21,6 +22,26 @@ def f_R1r_exch(inp,R1,R2,kEX,phi): #KTE:  R1rhoAnalysis.ipf. Line 115. Use see l
     #R1=R1r_exch_coef, R2=R1r_rates
     tiltAngle,omega1=inp
     return R1*cos(tiltAngle*pi/180)**2+(R2+phi*kEX/((2*pi*omega1/tan(tiltAngle*pi/180))**2+(2*pi*omega1)**2+kEX**2))*sin(tiltAngle*pi/180)**2
+
+############ Stat functions
+def Ftest(ss1,df1,ss2,df2):
+    ## KTE: R1rhoAnalysis.ipf. Line 364.
+    fRatio = ((ss1-ss2)/(df1-df2))/(ss2/df2) # fRatio = ((ss1-ss2)/(df1-df2))/(ss2/df2)  -  Fval=(WSSR1mWSSR2/P2mP1)/(WSSR2val/NmP2)
+    a = df2/2.0 # a = df2/2
+    b = (df1-df2)/2.0 # b = (df1-df2)/2
+    x = df2/(df2+(df1-df2)*fRatio) # x = df2/(df2+(df1-df2)*fRatio)
+    Pvalue = scipy.stats.stats.betai(a, b, x) # Pvalue = betai(a, b, x) - scipy.stats.stats.betai
+    
+    # Possible to set distlimit
+    distlimit = 0.95
+    Fval=((ss1-ss2)/(df1-df2))/(ss2/df2)
+    Fdist= scipy.stats.distributions.f.ppf(distlimit, df1 - df2, df2)
+    if Fval > Fdist:
+        Pval = (1-scipy.stats.distributions.f.cdf(Fval, df1 - df2, df2))
+    else:
+        Pval = False
+    #print Pvalue, Pval, (Pvalue-Pval)
+    return Fval, Fdist, Pval
 
 ############# Data modifications
 def getstat(dic,dt):
@@ -250,46 +271,127 @@ def plotR1(dics,mets=['CS'],NIs=[96]):
     R1r_coef=[2,23]
     R1r_exch_coef=[1,40,10000,100000]
     for dic in dics:
+        dic['rates'] = {}
         slicet = len(dic['time'])
+        unique_omega1 = sort(f5(dic['omega1']))
         for met in mets:
+            dic['rates'][met] = {}
             filenr = dic['filenr'][met]
             Dec = dic['decay'][met]
-            for NI in NIs:
-                #for peak in dic['peakrange'][met]:
-                for peak in range(1,2):
+            #for peak in dic['peakrange'][met]:
+            #for peak in [21]: #21,22,27
+            for peak in [1,5]: #21,22,27
+                dic['rates'][met][str(peak)] = {}
+                for NI in NIs:
+                    dic['rates'][met][str(peak)][str(NI)] = {}
+                    dic['rates'][met][str(peak)][str(NI)]['R1r'] = {}
+                    dic['rates'][met][str(peak)][str(NI)]['R1r_exch'] = {}
                     tiltAngle_arr = []
                     R1r_rates_arr = []
                     R1r_err_arr = []
                     peakname = Dec[str(peak)]['resn']
+                    dic['rates'][met][str(peak)][str(NI)]['resn'] = peakname
+                    omega1_arr = []
                     for fs in range(0,filenr,slicet):
                     ##for fs in range(0,5,slicet):
+                        #dic['rates'][met][str(peak)][str(NI)][str(i)] = {}
                         theta = Dec[str(peak)][str(NI)][str(fs)]['theta']
                         tiltAngle_arr.append(theta)
                         R1r_rates = Dec[str(peak)][str(NI)][str(fs)]['R1r_rates']
                         R1r_rates_arr.append(R1r_rates)
                         R1r_err = Dec[str(peak)][str(NI)][str(fs)]['R1r_err']
                         R1r_err_arr.append(R1r_err)
-                    datX = array(tiltAngle_arr)
+                        omega1 = Dec[str(peak)][str(NI)][str(fs)]['omega1']
+                        omega1_arr.append(omega1)
+                    # Prepare data 
+                    datX_f_R1r = array(tiltAngle_arr)
+                    datX_f_R1r_exch = [array(tiltAngle_arr), array(omega1_arr)]
                     datY = array(R1r_rates_arr)
-                    f_sigma = array(R1r_err_arr)
-                    print "before", R1r_coef,
-                    resa = scipy.optimize.curve_fit(f_R1r, datX, datY, p0=R1r_coef, sigma=f_sigma, full_output=1)
-                    R1r_dic = getstatpar(resa, datY)
-                    R1r_coef = R1r_dic['p']
-                    print "after", R1r_coef
-                    calcR1r = f_R1r(array(tiltAngle_arr),*R1r_coef)
+                    f_sigma = array(R1r_err_arr) # The std. error on Y
 
-                    datXs = sort(datX)
-                    fitXlin = linspace(datXs[0],datXs[-1],100)
-                    fitYlina = f_R1r(fitXlin,*R1r_coef)
-                    ax.plot(datX, datY, ".",label='%s %s %s. fit f_R1r: %s '%(met, peakname, NI, R1r_coef))
-                    ax.plot(fitXlin,fitYlina,"-",color=ax.lines[-1].get_color())
-    title('R1 fitting')
+                    Fval, Fdist, Pval = False, False, False
+                    # Calculate for R1r
+                    try:
+                        result_R1r = scipy.optimize.curve_fit(f_R1r, datX_f_R1r, datY, p0=R1r_coef, sigma=f_sigma, full_output=1)
+                        R1r_dic = getstatpar(result_R1r, datY)
+                        dic['rates'][met][str(peak)][str(NI)]['R1r'].update(R1r_dic)
+                        calcR1r = f_R1r(datX_f_R1r,*R1r_dic['p'])
+                        # Sort the xdata, and prepare for plot. xdata has to be sorted, or the graph look weird
+                        datXs_f_R1r = sort(datX_f_R1r)
+                        datYs_f_R1r = f_R1r(datXs_f_R1r,*R1r_dic['p'])
+                        datXs_f_R1r_lin = linspace(datXs_f_R1r[0],datXs_f_R1r[-1],100)
+                        datYs_f_R1r_lin = f_R1r(datXs_f_R1r_lin,*R1r_dic['p'])
+                    except RuntimeError as e:
+                        print "Cannot fit R1r_exch for %s. Reason: %s"%(peakname, e)
+
+                    # Calculate for R1r_exch
+                    try:
+                        result_R1r_exch = scipy.optimize.curve_fit(f_R1r_exch, datX_f_R1r_exch, datY, p0=R1r_exch_coef, sigma=f_sigma, full_output=1)
+                        R1r_exch_dic = getstatpar(result_R1r_exch, datY)
+                        dic['rates'][met][str(peak)][str(NI)]['R1r_exch'].update(R1r_exch_dic)
+                        calcR1r_exch = f_R1r_exch(datX_f_R1r_exch,*R1r_exch_dic['p'])
+                        # Sort the xdata, and prepare for plot. xdata has to be sorted, or the graph look weird
+                        tiltAngle_arr_s, omega1_arr_s = zip(*sorted(zip(tiltAngle_arr, omega1_arr)))
+                        datXs_f_R1r_exch = [array(tiltAngle_arr_s), array(omega1_arr_s)]
+                        datYs_f_R1r_exch = f_R1r_exch(datXs_f_R1r_exch,*R1r_exch_dic['p'])
+                        omega_plots = []
+                        for om1 in unique_omega1:
+                            tiltAngle_arr_s_lin = linspace(tiltAngle_arr_s[0],tiltAngle_arr_s[-1],100)
+                            om1_arr = ones(len(tiltAngle_arr_s_lin))*om1
+                            datXs_f_R1r_exch_lin = [array(tiltAngle_arr_s_lin), array(om1_arr)]
+                            datYs_f_R1r_exch_lin = f_R1r_exch(datXs_f_R1r_exch_lin,*R1r_exch_dic['p'])
+                            omega_plots.append([datXs_f_R1r_exch_lin,datYs_f_R1r_exch_lin])
+                        Fval, Fdist, Pval = Ftest(R1r_dic['chisq'],R1r_dic['NDF'],R1r_exch_dic['chisq'],R1r_exch_dic['NDF'])
+                    except RuntimeError as e:
+                        print "Cannot fit R1r_exch for %s %s. Reason: %s"%(peak, peakname, e)
+
+                    dic['rates'][met][str(peak)][str(NI)]['Fval'] = Pval
+                    dic['rates'][met][str(peak)][str(NI)]['Fdist'] = Fdist
+                    dic['rates'][met][str(peak)][str(NI)]['Pval'] = Pval
+
+                    if Pval==False:
+                        ax.plot(datX_f_R1r, datY, ".",label='%s %s %s. fit f_R1r: %s '%(met, peakname, NI, R1r_coef))
+                        ax.plot(datXs_f_R1r,datYs_f_R1r,"-",color=ax.lines[-1].get_color()) 
+                        ax.plot(datX_f_R1r,calcR1r,"o",mfc='none',mec=ax.lines[-1].get_color())#
+                        #ax.plot(datXs_f_R1r_lin,datYs_f_R1r_lin,"-",color=ax.lines[-1].get_color())
+
+                    elif Pval!=False:
+                        bx.plot(datX_f_R1r_exch[0], datY, ".",label='%s %s %s. fit f_R1r_exch: %s '%(met, peakname, NI, R1r_exch_dic['p']))
+                        #bx.plot(datXs_f_R1r_exch[0],datYs_f_R1r_exch,"-",color=bx.lines[-1].get_color())
+                        bx.plot(datX_f_R1r_exch[0],calcR1r_exch,"o",mfc='none',mec=bx.lines[-1].get_color())#,color=ax.lines[-1].get_color()
+                        for omp in omega_plots:
+                            
+                            bx.plot(omp[0][0],omp[1],"-",color=bx.lines[-1].get_color()) 
+
+    ax.set_title('R1 fitting')
+    #R1r graph
     ax.set_xlabel('Tilt angle')
     ax.set_ylabel('R1r_coef')
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
     ax.grid('on')
+    #R1r:exch graph
+    bx.set_xlabel('Tilt angle')
+    bx.set_ylabel('R1r_coef')
+    box = bx.get_position()
+    bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+    bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+    bx.grid('on')
     show()
-    return()
+    return(datX_f_R1r_exch)
+def f5(seq, idfun=None):
+   # order preserving. http://www.peterbe.com/plog/uniqifiers-benchmark
+   if idfun is None:
+       def idfun(x): return x
+   seen = {}
+   result = []
+   for item in seq:
+       marker = idfun(item)
+       # in old Python versions:
+       # if seen.has_key(marker)
+       # but in new ones:
+       if marker in seen: continue
+       seen[marker] = 1
+       result.append(item)
+   return result

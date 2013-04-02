@@ -35,4 +35,4 @@ TB.getdecay(BBL,BBL['qMDDmet'],30)
 #TB.plotstats([BBL,BBL2],BBL['qMDDmet'])
 
 #TB.plotdecays([BBL],['CS'],fss=range(0,10,5))
-TB.plotR1([BBL],BBL['qMDDmet'])
+t = TB.plotR1([BBL],BBL['qMDDmet'])
