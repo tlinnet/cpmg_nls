@@ -9,6 +9,7 @@ BBL = {}
 BBL['NMRpar'] = {'yCAR':117.843,'centerPPM':117.843,'yOBS':76.012,'frq':76.012}
 BBL['offset'] = (0,2000,500,5000,1000,20000,0,0,0,1000,2000,1000,2000,1000,2000) # offset/ddof2
 BBL['omega1'] = (1903.4,1903.4,1903.4,1903.4,1903.4,1903.4,1379.5,898.1,1113.1,1113.1,1113.1,1379.5,898.1,898.1,1379.5) #omega1/spinlock/slockpwr
+BBL['omega1_col'] = {'898.1':'r','1113.1':'g','1379.5':'b','1903.4':'y'} #omega1/spinlock/slockpwr
 BBL['time'] = array([0, 0.1, 0.4, 0.04, 0.2])
 BBL['desc'] = ('bbl-75/33','FT',10,50,'y')
 BBL['path'] = os.path.join('.','data','bblM_20130104_pH6_5C_0Murea_normal','analysis_FT','int_corr_ft_method_all_awk_full')
@@ -21,7 +22,9 @@ TB.getstat(BBL,BBL['qMDDmet'])
 TB.getser(BBL,BBL['qMDDmet'])
 TB.sortInt(BBL,BBL['qMDDmet'])
 TB.getdecay(BBL,BBL['qMDDmet'],30)
+TB.getrates(BBL,BBL['qMDDmet'])
 
+TB.plotrates([BBL],['CS'],range(1,10))
 #########################################
 #BBL2 = {}
 #BBL2['desc'] = ('bbl-75/33','FT',30,500,'y')
@@ -35,4 +38,4 @@ TB.getdecay(BBL,BBL['qMDDmet'],30)
 #TB.plotstats([BBL,BBL2],BBL['qMDDmet'])
 
 #TB.plotdecays([BBL],['CS'],fss=range(0,10,5))
-t = TB.plotR1([BBL],BBL['qMDDmet'])
+
