@@ -3,6 +3,7 @@ import numpy
 import scipy.optimize
 import scipy.stats.distributions
 import os
+import lmfit
 
 figsize = 16
 titfont = 26
@@ -356,15 +357,17 @@ def getrates(dic,mets=['CS'],NIs=[96]):
             dic['rates'][met][str(NI)]['Pval_peaks'] = Pval_peaks
     return()
 
-def plotrates(dics,mets=['CS'],peaks=range(1,10),NIs=[96]):
-    fig = figure()
-    ax = fig.add_subplot(211)
-    bx = fig.add_subplot(212)
+def plotrates(dics,mets=False,peaks=False,NIs=[96]):
     for dic in dics:
         unique_omega1 = sort(f5(dic['omega1']))
+        if not mets:
+            mets = dic['qMDDmet'][0]
         for met in mets:
+            if not peaks:
+                peaks = dic['peakrange'][met]
             for NI in NIs:
-                #for peak in dic['peakrange'][met]:
+                figR1r = figure('R1r %s'%NI)
+                ax = figR1r.add_subplot(111)
                 for peak in peaks:
                     dc = dic['rates'][met][str(NI)][str(peak)]
                     peakname = dc['resn']
@@ -385,6 +388,8 @@ def plotrates(dics,mets=['CS'],peaks=range(1,10),NIs=[96]):
                         ax.plot(datX_f_R1r,calcR1r,"o",mfc='none',mec=ax.lines[-1].get_color())#
                         #ax.plot(datXs_f_R1r_lin,datYs_f_R1r_lin,"-",color=ax.lines[-1].get_color())
                     if Pval!=False:
+                        figR1r_exch = figure('R1r_exch %s %s'%(NI,peak))
+                        bx = figR1r_exch.add_subplot(111)
                     # Get values for R1r_exch
                         datX_f_R1r_exch = dc['R1r_exch']['data'][0]
                         datY_f_R1r_exch = dc['R1r_exch']['data'][1]
@@ -402,28 +407,47 @@ def plotrates(dics,mets=['CS'],peaks=range(1,10),NIs=[96]):
                             datXs_f_R1r_exch_lin = [array(tiltAngle_arr_s_lin), array(om1_arr)]
                             datYs_f_R1r_exch_lin = f_R1r_exch(datXs_f_R1r_exch_lin,*dc['R1r_exch']['p'])
                             omega_plots.append([datXs_f_R1r_exch_lin,datYs_f_R1r_exch_lin])
-                        bx.errorbar(datX_f_R1r_exch[0], datY_f_R1r_exch, yerr=datY_f_R1r_exch_err,fmt=".",label='%s %s %s. fit f_R1r_exch: %s '%(met, peakname, NI, dc['R1r_exch']['p']))
+                        bx.errorbar(datX_f_R1r_exch[0], datY_f_R1r_exch, yerr=datY_f_R1r_exch_err,fmt=".",label='%s %s %s'%(met, peakname, NI)) #  fit f_R1r_exch: %s, dc['R1r_exch']['p']
                         for omp in omega_plots:
                             colval = dic['omega1_col'][str(omp[0][1][0])]
                             #print colval
-                            bx.plot(omp[0][0],omp[1],"-",color=bx.lines[-1].get_color()) #
+                            bx.plot(omp[0][0],omp[1],"-", color=colval) # ,color=bx.lines[-1].get_color()
                         #bx.plot(datXs_f_R1r_exch[0],datYs_f_R1r_exch,"-",color=bx.lines[-1].get_color())
                         bx.plot(datX_f_R1r_exch[0],calcR1r_exch,"o",mfc='none',mec=bx.lines[-1].get_color())#,color=bx.lines[-1].get_color()
-
-    ax.set_title('R1 fitting')
-    #R1r graph
-    ax.set_xlabel('Tilt angle')
-    ax.set_ylabel('R1r_coef')
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
-    ax.grid('on')
-    #R1r:exch graph
-    bx.set_xlabel('Tilt angle')
-    bx.set_ylabel('R1r_coef')
-    box = bx.get_position()
-    bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
-    bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
-    bx.grid('on')
+                        #R1r_exch graph
+                        bx.set_title('R1_exch fitting: %s'%met)
+                        bx.set_xlabel('Tilt angle')
+                        bx.set_ylabel('R1r_coef')
+                        box = bx.get_position()
+                        bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+                        bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+                        bx.grid('on') 
+                #R1r graph
+                ax.set_title('R1 fitting')
+                ax.set_xlabel('Tilt angle')
+                ax.set_ylabel('R1r_coef')
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+                ax.grid('on')
     show()
+    return()
+
+def getglobfit(dic,mets=['coMDD'],peaks=False,NIs=[96]):
+    for met in mets:
+        if not peaks:
+            peaks = dic['peakrange'][met]
+        for NI in NIs:
+            for peak in peaks:
+                dc = dic['rates'][met][str(NI)][str(peak)]
+                peakname = dc['resn']
+                Pval = dic['rates'][met][str(NI)][str(peak)]['Pval']
+                if Pval!=False:
+                # Get values for R1r_exch
+                    datX_f_R1r_exch = dc['R1r_exch']['data'][0]
+                    datY_f_R1r_exch = dc['R1r_exch']['data'][1]
+                    datY_f_R1r_exch_err = dc['R1r_exch']['data'][2]
+                    calcR1r_exch = dc['R1r_exch']['data'][3]
+                    R1,R2,kEX,phi = dc['R1r_exch']['p']
+                    print "p: R1=%3.2f, R2=%3.2f, kEX=%3.2f, phi=%3.2f"%(R1,R2,kEX,phi)
     return()
