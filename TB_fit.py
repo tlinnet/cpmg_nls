@@ -22,11 +22,12 @@ TB.getstat(BBL,BBL['qMDDmet'])
 TB.getser(BBL,BBL['qMDDmet'])
 TB.sortInt(BBL,BBL['qMDDmet'])
 TB.getdecay(BBL,BBL['qMDDmet'],30)
-TB.getrates(BBL,BBL['qMDDmet'])
-#TB.getglobfit(BBL,BBL['qMDDmet'])
-
 #TB.plotdecays([BBL],BBL['qMDDmet'],fss=range(0,10,5))
-TB.plotrates([BBL],BBL['qMDDmet'],peaks=range(1,3))
+p = TB.getrates(BBL,BBL['qMDDmet'])
+TB.plotrates([BBL],BBL['qMDDmet'],p)
+psel = [3, 5, 6, 7, 8, 9, 11, 14, 15, 16, 18, 19, 21, 23, 24, 26, 27, 28, 30, 31, 32, 33]
+#psel = [3, 5]
+TB.getglobfit(BBL,BBL['qMDDmet'],psel)
 #########################################
 #BBL2 = {}
 #BBL2['desc'] = ('bbl-75/33','FT',30,500,'y')
