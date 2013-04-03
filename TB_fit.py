@@ -14,7 +14,7 @@ BBL['time'] = array([0, 0.1, 0.4, 0.04, 0.2])
 BBL['desc'] = ('bbl-75/33','FT',10,50,'y')
 BBL['path'] = os.path.join('.','data','bblM_20130104_pH6_5C_0Murea_normal','analysis_FT','int_corr_ft_method_all_awk_full')
 #BBL['path'] = os.path.join('/','home','tlinnet','kte','t1rho','bblM_20130104_pH6_5C_0Murea_normal','analysis_FT','int_corr_ft_method_all_awk_full')
-BBL['qMDDmet'] = ['CS','coMDD'] #['CS','coMDD']
+BBL['qMDDmet'] = ['coMDD'] #['CS','coMDD']
 BBL['ser'] = {'pre':'allplanes_','filee':'.ser'}
 BBL['stats'] = {'pre':'allplanes_','filee':'.stats'}
 
@@ -25,8 +25,8 @@ TB.getdecay(BBL,BBL['qMDDmet'],30)
 TB.getrates(BBL,BBL['qMDDmet'])
 #TB.getglobfit(BBL,BBL['qMDDmet'])
 
-#TB.plotdecays([BBL],['CS'],fss=range(0,10,5))
-#TB.plotrates([BBL],BBL['qMDDmet'],peaks=range(1,10))
+#TB.plotdecays([BBL],BBL['qMDDmet'],fss=range(0,10,5))
+TB.plotrates([BBL],BBL['qMDDmet'],peaks=range(1,3))
 #########################################
 #BBL2 = {}
 #BBL2['desc'] = ('bbl-75/33','FT',30,500,'y')
