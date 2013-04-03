@@ -14,6 +14,12 @@ figfont = 12
 def f_expdecay(time,a,b): #KTE: extract_sums_to_table.pl. Line 68
     return a*exp(-b*time)
 
+def f_expdecay_lmfit(pars,x,data=None): #KTE: extract_sums_to_table.pl. Line 68
+    amp = pars['amp'].value
+    decay = pars['decay'].value
+    model = amp*exp(-decay*x)
+    return(model-data)
+
 def f_R1r(tiltAngle,R1,R2): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
     #R1=R1r_coef, R2=R1r_rates
     return R1*cos(tiltAngle*pi/180.0)**2+R2*sin(tiltAngle*pi/180.0)**2
@@ -141,7 +147,7 @@ def getdecay(dic,dt,NIrem=10):
         for NI in NIarr[:1]:
             dic['decay'][met][str(NI)] = {}
             for peak in dic['peakrange'][met]:
-            ##for peak in ['1']:
+            #for peak in ['1']:
                 dic['decay'][met][str(NI)][str(peak)] = {}
                 peakname = Int[str(peak)]['resn']
                 dic['decay'][met][str(NI)][str(peak)]['resn'] = peakname
@@ -161,22 +167,23 @@ def getdecay(dic,dt,NIrem=10):
                     divi = FTInt.argmax()
                     datY = FTInt*NIInt/(FTInt[divi]*NIInt[divi])
 
-                    pguess = (1.0,10.0)
-                    res = scipy.optimize.curve_fit(f_expdecay, datX, datY,p0=pguess, full_output=1)
-                    dec_dic = getstatpar(res, datY)
+                    par = lmfit.Parameters()
+                    #           (Name,   Value,  Vary,   Min,  Max,  Expr)
+                    par.add_many(('amp', 1.0,True, None, None,  None),
+                                ('decay',10.0,True, None, None,  None))
+                    lmf = lmfit.minimize(f_expdecay_lmfit, par, args=(datX, datY),method='leastsq')
+                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['par'] = par
+                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['lmf'] = lmf
 
-                    fitY = f_expdecay(datX,*dec_dic['p'])
+                    fitY = datY+lmf.residual
 
-                    R1r_rates = dec_dic['p'][1]
-                    R1r_err = dec_dic['psterr'][1]
-                    x_y_fit_resi = array([datX,datY,fitY,dec_dic['resi']]).T
+                    R1r_rates = par['decay'].value
+                    R1r_err = par['decay'].stderr
+                    x_y_fit_resi = array([datX,datY,fitY,lmf.residual]).T
 
                     dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'] = x_y_fit_resi
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['a'] = [dec_dic['p'][0],dec_dic['psterr'][0]]
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['b'] = [dec_dic['p'][1],dec_dic['psterr'][1]]
                     dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_rates'] = R1r_rates
                     dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_err'] = R1r_err
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dec_dic)
                     # Setting keys
                     offset = dic['offset'][i]
                     omega1 = dic['omega1'][i]
@@ -229,10 +236,10 @@ def plotdecays(dics,mets=['CS'],peaks=[1],NIs=[96],fss=[0]):
                         datY = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,1]
                         fitY = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,2]
                         resi = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,3]
-                        a = dic['decay'][met][str(NI)][str(peak)][str(fs)]['a'][0]
-                        a_e = dic['decay'][met][str(NI)][str(peak)][str(fs)]['a'][1]
-                        b = dic['decay'][met][str(NI)][str(peak)][str(fs)]['b'][0]
-                        b_e = dic['decay'][met][str(NI)][str(peak)][str(fs)]['b'][1]
+                        a = dic['decay'][met][str(NI)][str(peak)][str(fs)]['par']['amp'].value
+                        a_e = dic['decay'][met][str(NI)][str(peak)][str(fs)]['par']['amp'].stderr
+                        b = dic['decay'][met][str(NI)][str(peak)][str(fs)]['par']['decay'].value
+                        b_e = dic['decay'][met][str(NI)][str(peak)][str(fs)]['par']['decay'].stderr
 
                         datXs = sort(datX)
                         fitXlin = linspace(datXs[0],datXs[-1],100)
