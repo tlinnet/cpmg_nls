@@ -14,6 +14,8 @@ import pylab as pl
 import numpy as np
 import scipy.optimize
 import lmfit
+from datetime import datetime
+startTime = datetime.now()
 #
 ############# Fitting functions ################
 def sim(pars,x,data=None,eps=None):
@@ -32,7 +34,7 @@ def err_global(pars,x_arr,y_arr,sel_p):
     for i in range(len(sel_p)):
         p = sel_p[i]
         par = lmfit.Parameters()
-        par.add('b', value=pars['b'].value, vary=True)
+        par.add('b', value=pars['b'].value, vary=True, min=0.0)
         par.add('a', value=pars['a%s'%p].value, vary=True)
         par.add('c', value=pars['c%s'%p].value, vary=True)
         x = x_arr[i]
@@ -88,7 +90,7 @@ par = lmfit.Parameters(); par.add('b', value=0.15, vary=True); par.add('a', valu
 pd['2'] = par       # parameters for the second trajectory, same b
 par = lmfit.Parameters(); par.add('b', value=0.15, vary=True); par.add('a', value=1.2, vary=True); par.add('c', value=0.3, vary=True)
 pd['3'] = par       # parameters for the third trajectory, same b
-pd = gendat(9)  # You can generate a large number of peaks to test
+pd = gendat(300)  # You can generate a large number of peaks to test
 #
 #Start making a dictionary, which holds all data
 dic = {}; dic['peaks']=range(1,len(pd)+1)
@@ -102,9 +104,9 @@ for p in dic['peaks']:
 #print "keys for start dictionary:", dic.keys()
 #
 # independent fitting of the trajectories
+print "Fitting single peaks N=%s %s"%(len(pd),(datetime.now()-startTime))
 for p in dic['peaks']:
-    pguess = [2.0, 2.0, 2.0]
-    par = lmfit.Parameters(); par.add('b', value=2.0, vary=True); par.add('a', value=2.0, vary=True); par.add('c', value=2.0, vary=True)
+    par = lmfit.Parameters(); par.add('b', value=2.0, vary=True, min=0.0); par.add('a', value=2.0, vary=True); par.add('c', value=2.0, vary=True)
     lmf = lmfit.minimize(sim, par, args=(dic[str(p)]['X'], dic[str(p)]['Yran']),method='leastsq')
     dic[str(p)]['fit']['par']= par
     dic[str(p)]['fit']['lmf']= lmf
@@ -114,8 +116,10 @@ for p in dic['peaks']:
     dic[str(p)]['fit']['Yfit'] = Yfit
     #print "Best fit parameter for peak %s. %3.2f %3.2f %3.2f."%(p,par['b'].value,par['a'].value,par['c'].value),
     #print "Compare to real paramaters. %3.2f %3.2f %3.2f."%(pd[str(p)]['b'].value,pd[str(p)]['a'].value,pd[str(p)]['c'].value)
+print "Done with fitting single peaks %s\n"%(datetime.now()-startTime)
 #
 # Make a selection flag, based on some test. Now a chisq value, but could be a Ftest between a simple and advanced model fit.
+print "Make a test on chisqr %s"%(datetime.now()-startTime)
 sel_p = []
 for p in dic['peaks']:
     chisq = dic[str(p)]['fit']['lmf'].chisqr
@@ -123,39 +127,46 @@ for p in dic['peaks']:
     #print chisq - chisq2 "Test for difference in two ways to get chisqr"
     if chisq < limit:
         dic[str(p)]['Pval'] = 1.0
-        print "Peak %s passed test"%p
+        #print "Peak %s passed test"%p
         sel_p.append(p)
     else:
         dic[str(p)]['Pval'] = False
+print 'Done with test on chisqr %s\n'%(datetime.now()-startTime)
 #print sel_p
 #
 # Global fitting
 # Pick up x,y-values and parameters that passed the test
 X_arr = []
 Y_arr = []
-P_arr = lmfit.Parameters(); P_arr.add('b', value=1.0, vary=True)
+P_arr = lmfit.Parameters(); P_arr.add('b', value=1.0, vary=True, min=0.0)
 dic['gfit'] = {} # Make room for globat fit result
+print "Prepare for global fit %s"%(datetime.now()-startTime)
 for p in sel_p:
     par = dic[str(p)]['fit']['par']
     X_arr.append(dic[str(p)]['X'])
     Y_arr.append(dic[str(p)]['Yran'])
     P_arr.add('a%s'%p, value=par['a'].value, vary=True)
     P_arr.add('c%s'%p, value=par['c'].value, vary=True)
+print "Doing global fit %s"%(datetime.now()-startTime)
 lmf = lmfit.minimize(err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
+print "Done with global fit %s"%(datetime.now()-startTime)
 dic['gfit']['par']= P_arr
 dic['gfit']['lmf']= lmf
 unpack_global(dic, sel_p) # Unpack the paramerts into the selected peaks
+print "global fit unpacked %s \n"%(datetime.now()-startTime)
 #
 # Check result
-for p in sel_p:
-    ip= pd[str(p)]; sp = dic[str(p)]['fit']['par']; gp = dic[str(p)]['gfit']['par']
+#for p in sel_p:
+#    ip= pd[str(p)]; sp = dic[str(p)]['fit']['par']; gp = dic[str(p)]['gfit']['par']
     #print p, "Single fit. %3.2f %3.2f %3.2f"%(sp['b'].value,sp['a'].value,sp['c'].value),
     #print "Global fit. %3.2f %3.2f %3.2f"%(gp['b'].value,gp['a'].value,gp['c'].value)
-    print p, "Single fit. %3.2f %3.2f %3.2f"%(sp['b'].value-ip['b'].value,sp['a'].value-ip['a'].value,sp['c'].value-ip['c'].value),
-    print "Global fit. %3.2f %3.2f %3.2f"%(gp['b'].value-ip['b'].value,gp['a'].value-ip['a'].value,gp['c'].value-ip['c'].value)##
+    #print p, "Single fit. %3.2f %3.2f %3.2f"%(sp['b'].value-ip['b'].value,sp['a'].value-ip['a'].value,sp['c'].value-ip['c'].value),
+    #print "Global fit. %3.2f %3.2f %3.2f"%(gp['b'].value-ip['b'].value,gp['a'].value-ip['a'].value,gp['c'].value-ip['c'].value)##
 #
 # Start plotting
+print "Making figure %s"%(datetime.now()-startTime)
 fig = pl.figure('Peak')
+sel_p = sel_p[:9]
 for i in range(len(sel_p)):
     p = sel_p[i]
     # Create figure
@@ -189,4 +200,5 @@ for i in range(len(sel_p)):
     ax.grid('on')
 ax.set_xlabel('Time')
 #
+print "ready to show figure %s"%(datetime.now()-startTime)
 pl.show()
