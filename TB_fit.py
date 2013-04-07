@@ -14,22 +14,23 @@ BBL['omega1_col'] = {'898.1':'r','1113.1':'g','1379.5':'b','1903.4':'y'} #omega1
 BBL['time'] = array([0, 0.1, 0.4, 0.04, 0.2])
 BBL['guess'] = {'s_R1':1.0,'s_R2':40.0,'s_kEX':10000.0,'s_phi':100000.0,'g_kEX':10000.0}
 BBL['desc'] = ('bbl-75/33','FT',10,50,'y')
-BBL['NIstop'] = 60
+BBL['NIstop'] = 86
 BBL['path'] = os.path.join(dn,'data','bblM_20130104_pH6_5C_0Murea_normal','analysis_FT','int_corr_ft_method_all_awk_full')
 #BBL['path'] = os.path.join('/','home','tlinnet','kte','t1rho','bblM_20130104_pH6_5C_0Murea_normal','analysis_FT','int_corr_ft_method_all_awk_full')
-BBL['qMDDmet'] = ['CS','coMDD'] # ['FT']
+BBL['qMDDmet'] = ['FT','coMDD'] #  ['CS','coMDD']
 BBL['ser'] = {'pre':'allplanes_','filee':'.ser'}
 BBL['stats'] = {'pre':'allplanes_','filee':'.stats'}
 
 TB.getstat(BBL,BBL['qMDDmet'])
 TB.getser(BBL,BBL['qMDDmet'])
 TB.sortInt(BBL,BBL['qMDDmet'])
+#l = range(70,86,2); BBL['NIarr']['FT'] = l[::-1]
 TB.getdecay(BBL,BBL['qMDDmet'])
 #TB.plotdecays([BBL],BBL['qMDDmet'],fss=range(0,10,5))
 p = TB.getrates(BBL,BBL['qMDDmet'])
 #TB.plotrates([BBL],BBL['qMDDmet'])
-psel = [3, 5, 6, 7, 8, 9, 11, 14, 15, 16, 18, 19, 21, 23, 24, 26, 27, 28, 30, 31, 32, 33]
-TB.getglobfit(BBL,BBL['qMDDmet'],psel)
+#psel = [3, 5, 6, 7, 8, 9, 11, 14, 15, 16, 18, 19, 21, 23, 24, 26, 27, 28, 30, 31, 32, 33]
+TB.getglobfit(BBL,BBL['qMDDmet'])
 TB.plot_kEX([BBL],BBL['qMDDmet'])
 #########################################
 #BBL2 = {}

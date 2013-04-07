@@ -5,6 +5,13 @@ import scipy.stats.distributions
 import os
 import lmfit #See http://newville.github.com/lmfit-py/parameters.html
 
+#### Standard size of some figures
+figsize = 16
+titfont = 26
+labfont = 12
+figfont = 12
+
+###### To print out to both screen and log file
 import sys
 class Logger(object):
     def __init__(self, filename="Default.log"):
@@ -15,16 +22,18 @@ class Logger(object):
         self.log.write(message)
 sys.stdout = Logger("Log_file.txt")
 
-figsize = 16
-titfont = 26
-labfont = 12
-figfont = 12
+##### To handle "RuntimeWarning" from fitting functions to be handled as errors
+#import warnings
+#warnings.simplefilter('error')
 
 ############ Fit functions
 def f_expdecay_lmfit(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
     amp = pars['amp'].value
     decay = pars['decay'].value
+#    try:
     model = amp*exp(-decay*time)
+#    except (RuntimeError, ValueError, RuntimeWarning, UnboundLocalError) as e:
+#        print "Cannot fit expdecay. Reason: %s"%(e)
     if data is None:
         return model
     return (model-data)
@@ -61,8 +70,8 @@ def f_R1r_exch_global(pars,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None):
         tilt =tilt_a[i];om1=om1_a[i];R1rex=R1rex_a[i];R1rex_err=R1rex_err_a[i]
         par = lmfit.Parameters()
         par.add('kEX', value=pars['kEX'].value, vary=True, min=0.0)
-        par.add('R1', value=pars['R1%s'%p].value, vary=True)
-        par.add('R2', value=pars['R2%s'%p].value, vary=True)
+        par.add('R1', value=pars['R1%s'%p].value, vary=True, min=0.0)
+        par.add('R2', value=pars['R2%s'%p].value, vary=True, min=0.0)
         par.add('phi', value=pars['phi%s'%p].value, vary=True, min=0.0)
         datX = [array(tilt), array(om1)]
         Yfit = f_R1r_exch_lmfit(par,datX)
@@ -218,12 +227,13 @@ def plotstats(dics,dt):
     show()
     return()
 
-def getdecay(dic,mets,NIstop=False):
+def getdecay(dic,mets=False,NIstop=False):
     datX = dic['time']
     centerPPM = dic['NMRpar']['centerPPM']
     frq = dic['NMRpar']['frq']
     slicet = len(datX)
     dic['decay'] = {}
+    if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         Int = dic['Int'][met]
         filenr = dic['filenr'][met]
@@ -256,19 +266,22 @@ def getdecay(dic,mets,NIstop=False):
                     divi = FTInt.argmax()
                     datY = FTInt*NIInt/(FTInt[divi]*NIInt[divi])
                     par = lmfit.Parameters()
-                    par.add('amp', value=1.0, vary=True)
-                    par.add('decay', value=10.0, vary=True)
-                    lmf = lmfit.minimize(f_expdecay_lmfit, par, args=(datX, datY),method='leastsq')
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['par'] = par
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['lmf'] = lmf
-                    #fitY = datY+lmf.residual
-                    fitY = f_expdecay_lmfit(par,datX)
-                    R1r_rates = par['decay'].value
-                    R1r_err = par['decay'].stderr
-                    x_y_fit_resi = array([datX,datY,fitY]).T
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'] = x_y_fit_resi
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_rates'] = R1r_rates
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_err'] = R1r_err
+                    par.add('amp', value=1.0, vary=True, min=0.0)
+                    par.add('decay', value=10.0, vary=True, min=0.0)
+                    try:
+                        lmf = lmfit.minimize(f_expdecay_lmfit, par, args=(datX, datY),method='leastsq')
+                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['par'] = par
+                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['lmf'] = lmf
+                        #fitY = datY+lmf.residual
+                        fitY = f_expdecay_lmfit(par,datX)
+                        R1r_rates = par['decay'].value
+                        R1r_err = par['decay'].stderr
+                        x_y_fit_resi = array([datX,datY,fitY]).T
+                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'] = x_y_fit_resi
+                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_rates'] = R1r_rates
+                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_err'] = R1r_err
+                    except (Exception) as e:
+                        print "Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e)
                     # Setting keys
                     offset = dic['offset'][i]
                     omega1 = dic['omega1'][i]
@@ -294,14 +307,15 @@ def getdecay(dic,mets,NIstop=False):
                     i+=1
     return()
 
-def plotdecays(dics,mets=['CS'],peaks=False,NIarr=False,fss=[0]):
+def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
     #TB.plotdecays([BBL],['coMDD'])
     #TB.plotdecays([BBL],['coMDD','CS'],fss=range(0,35,5))
     fig = figure()
     ax = fig.add_subplot(111)
     for dic in dics:
+        if not mets: mets = dic['qMDDmet'][0]
         for met in mets:
-            if not NIarr: NIarr = [dic['NImax'][met]]
+            if not NIarr: NIarr = dic['NImax'][met]
             for NI in NIarr:
                 if not peaks: peaks = ['1']
                 print peaks, type(peaks)
@@ -332,9 +346,10 @@ def plotdecays(dics,mets=['CS'],peaks=False,NIarr=False,fss=[0]):
     show()
     return()
 
-def getrates(dic,mets=['CS'],NIstop=False):
+def getrates(dic,mets=False,NIstop=False):
     dic['rates'] = {}
     slicet = len(dic['time'])
+    if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         dic['rates'][met] = {}
         filenr = dic['filenr'][met]
@@ -379,8 +394,8 @@ def getrates(dic,mets=['CS'],NIstop=False):
                 # Calculate for R1r
                 try:
                     par_R1r = lmfit.Parameters()
-                    par_R1r.add('R1', value=2.0, vary=True)
-                    par_R1r.add('R2', value=23.0, vary=True)
+                    par_R1r.add('R1', value=2.0, vary=True, min=0.0)
+                    par_R1r.add('R2', value=23.0, vary=True, min=0.0)
                     lmf_R1r = lmfit.minimize(f_R1r_lmfit, par_R1r, args=(datX_f_R1r, datY, f_sigma),method='leastsq')
                     dic['rates'][met][str(NI)][str(peak)]['R1r']['par'] = par_R1r
                     dic['rates'][met][str(NI)][str(peak)]['R1r']['lmf'] = lmf_R1r
@@ -388,13 +403,13 @@ def getrates(dic,mets=['CS'],NIstop=False):
                     calcR1r = f_R1r_lmfit(par_R1r,datX_f_R1r)
                     x_y_fit_resi = array([datX_f_R1r,datY,f_sigma,calcR1r]).T
                     dic['rates'][met][str(NI)][str(peak)]['R1r']['data'] = x_y_fit_resi
-                except RuntimeError as e:
-                    print "Cannot fit R1r for %s %s. Reason: %s"%(peak, peakname, e)
+                except (Exception) as e:
+                    print "Cannot fit R1r for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
                 # Calculate for R1r_exch
                 try:
                     par_R1r_exch = lmfit.Parameters()
-                    par_R1r_exch.add('R1', value=dic['guess']['s_R1'], vary=True)
-                    par_R1r_exch.add('R2', value=dic['guess']['s_R2'], vary=True)
+                    par_R1r_exch.add('R1', value=dic['guess']['s_R1'], vary=True, min=0.0)
+                    par_R1r_exch.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
                     par_R1r_exch.add('kEX', value=dic['guess']['s_kEX'], vary=True, min=0.0)
                     par_R1r_exch.add('phi', value=dic['guess']['s_phi'], vary=True, min=0.0)
                     #print par_R1r_exch['kEX'].value, par_R1r_exch['kEX'].min
@@ -406,8 +421,8 @@ def getrates(dic,mets=['CS'],NIstop=False):
                     x_y_fit_resi = array([datX_f_R1r_exch,datY,f_sigma,calcR1r_exch]).T
                     dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['data'] = x_y_fit_resi
                     Fval, Fdist, Pval = Ftest(lmf_R1r.chisqr,lmf_R1r.nfree,lmf_R1r_exch.chisqr,lmf_R1r_exch.nfree)
-                except RuntimeError as e:
-                    print "Cannot fit R1r_exch for %s %s. Reason: %s"%(peak, peakname, e)
+                except (Exception) as e:
+                    print "Cannot fit R1r_exch NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
                 dic['rates'][met][str(NI)][str(peak)]['Fval'] = Pval
                 dic['rates'][met][str(NI)][str(peak)]['Fdist'] = Fdist
                 dic['rates'][met][str(NI)][str(peak)]['Pval'] = Pval
@@ -416,9 +431,8 @@ def getrates(dic,mets=['CS'],NIstop=False):
                 elif Pval!=False:
                     Pval_peaks.append(peak)
             dic['rates'][met][str(NI)]['Pval_peaks'] = Pval_peaks
-    print "Following peak numbers passed the Ftest"
-    print Pval_peaks
-    return(Pval_peaks)
+            print "Following peak numbers passed the Ftest. NI=%s. Peaks:%s"%(NI, Pval_peaks)
+    return()
 
 def plotrates(dics,mets=False,peaks=False,NIarr=False):
     for dic in dics:
@@ -496,14 +510,11 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
     show()
     return()
 
-def getglobfit(dic,mets=['coMDD'],peaks=False,NIstop=False):
+def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
     dic['gfit'] = {}
+    if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         dic['gfit'][met] = {}
-        if not peaks:
-            peaks = dic['rates'][met][str(NI)]['Pval_peaks']# dic['peakrange'][met]
-            testPval = True
-        else: testPval = False
         NIarr = dic['NIarr'][met]
         for NI in NIarr:
             if NIstop:
@@ -512,8 +523,14 @@ def getglobfit(dic,mets=['coMDD'],peaks=False,NIstop=False):
             else:
                 if NI <= dic['NIstop']: break
                 else: pass
+            if not peaklist:
+                peaks = dic['rates'][met][str(NI)]['Pval_peaks']# dic['peakrange'][met]
+                testPval = True
+            else:
+                peaks = peaklist
+                testPval = False
             print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
-            print "Getting Global fit for NI=%s"%NI
+            print "%s Global fit for NI=%s, Peaks:%s"%(met,NI,peaks)
             dic['gfit'][met][str(NI)] = {}
             tilt = []
             om1 = []
@@ -542,9 +559,9 @@ def getglobfit(dic,mets=['coMDD'],peaks=False,NIstop=False):
                     tilt.append(tiltAngle_arr_s); om1.append(omega1_arr_s)
                     R1rex.append(datY_f_R1r_exch)
                     R1rex_err.append(datY_f_R1r_exch_err)
-                    P_arr.add('R1%s'%peak, value=par_R1r_exch['R1'].value, vary=True)
-                    P_arr.add('R2%s'%peak, value=par_R1r_exch['R2'].value, vary=True)
-                    P_arr.add('phi%s'%peak, value=par_R1r_exch['phi'].value, vary=True)
+                    P_arr.add('R1%s'%peak, value=par_R1r_exch['R1'].value, vary=True, min=0.0)
+                    P_arr.add('R2%s'%peak, value=par_R1r_exch['R2'].value, vary=True, min=0.0)
+                    P_arr.add('phi%s'%peak, value=par_R1r_exch['phi'].value, vary=True, min=0.0)
                     sel_p.append(peak)
                     dic['gfit'][met][str(NI)][str(peak)]['resn'] = peakname
             dic['gfit'][met][str(NI)]['gfit_peaks'] = sel_p
