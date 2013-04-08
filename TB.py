@@ -54,7 +54,7 @@ def multi_f_expdecay(inp):
     dic2 = unpack_f_expdecay(parlmf,X,Y)
     return(dic2)
 
-def unpack_f_expdecay(par,X,Y,lmf):
+def unpack_f_expdecay(par,X,Y,lmf=None):
     dic2 = {}
     Yfit = f_expdecay(par,X)
     dic2['Yfit']=Yfit
@@ -184,37 +184,9 @@ def f_R1r_exch_global(pars,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None):
         toterr = np.concatenate((toterr, erri))
     return toterr
 
-def unpack_global(dic, p_list, met, NI):
-    for i in range(len(p_list)):
-        p = p_list[i]
-        par = lmfit.Parameters()
-        dic['gfit'][met][str(NI)][str(p)] = {}
-        kEX = dic['gfit'][met][str(NI)]['par']['kEX']
-        R1 = dic['gfit'][met][str(NI)]['par']['R1%s'%p]
-        R2 = dic['gfit'][met][str(NI)]['par']['R2%s'%p]
-        phi = dic['gfit'][met][str(NI)]['par']['phi%s'%p]
-        par['kEX'] = kEX; par['R1'] = R1; par['R2'] = R2; par['phi'] = phi
-        dic['gfit'][met][str(NI)][str(p)]['par'] = par
-        # Calc other parameters for the fit
-        datX_f_R1r_exch = dic['rates'][met][str(NI)][str(p)]['R1r_exch']['data'][0]
-        datY_f_R1r_exch = dic['rates'][met][str(NI)][str(p)]['R1r_exch']['data'][1]
-        Yfit = f_R1r_exch(par,datX_f_R1r_exch)
-        dic['gfit'][met][str(NI)][str(p)]['Yfit'] = Yfit
-        residual = Yfit - datY_f_R1r_exch
-        dic['gfit'][met][str(NI)][str(p)]['residual'] = residual
-        chisqr = sum(residual**2)
-        dic['gfit'][met][str(NI)][str(p)]['chisqr'] = chisqr
-        NDF = len(residual)-len(par)
-        dic['gfit'][met][str(NI)][str(p)]['NDF'] = NDF
-        dic['gfit'][met][str(NI)][str(p)]['what_is_this_called'] = sqrt(chisqr/NDF)
-        dic['gfit'][met][str(NI)][str(p)]['redchisqr'] = chisqr/NDF
-        #print "#####################  PEAK %s ##################################"%p
-        #print "Peak %s .chisqr=%3.2f. kEX= "%(p,chisqr,kEX.value)
-        #lmfit.printfuncs.report_errors(par)
-    return()
-
-def unpack_global2(P_arr,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None,lmf=None):
+def unpack_global(P_arr,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None,lmf=None):
     dic2 = {}
+    dic_calc = {}
     residual_arr = np.array([])
     for i in range(len(sel_p)):
         p = sel_p[i]
@@ -229,16 +201,18 @@ def unpack_global2(P_arr,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None,lmf=None):
         #par['kEX'] = kEX_glob; par['R1'] = R1; par['R2'] = R2; par['phi'] = phi
         #print "Peak %s .chisqr=%3.2f. kEX= "%(p,chisqr,kEX.value)
         #lmfit.printfuncs.report_errors(par)
-        dic2['par']={}
-        dic2['par']['kEX_v'] = kEX_glob.value; dic2['par']['kEX_e'] = kEX_glob.stderr
-        dic2['par']['R1_v'] = R1.value; dic2['par']['R1_e'] = R1.stderr
-        dic2['par']['R2_v'] = R2.value; dic2['par']['R2_e'] = R2.stderr
-        dic2['par']['phi_v'] = phi.value; dic2['par']['phi_e'] = phi.stderr
+        dic_calc['par']={}
+        dic_calc['par']['kEX_v'] = kEX_glob.value; dic_calc['par']['kEX_e'] = kEX_glob.stderr
+        dic_calc['par']['R1_v'] = R1.value; dic_calc['par']['R1_e'] = R1.stderr
+        dic_calc['par']['R2_v'] = R2.value; dic_calc['par']['R2_e'] = R2.stderr
+        dic_calc['par']['phi_v'] = phi.value; dic_calc['par']['phi_e'] = phi.stderr
         datX = [array(tilt), array(om1)]
         #Yfit = f_R1r_exch(par,datX)
-        Yfit = f_R1r_exch_calc(dic2['par'],datX)
+        Yfit = f_R1r_exch_calc(dic_calc['par'],datX)
         residual = Yfit - R1rex
         residual_arr = np.concatenate((residual_arr, residual))
+    dic2['par'] = {}
+    dic2['par']['kEX_v'] = kEX_glob.value; dic2['par']['kEX_e'] = kEX_glob.stderr
     #print sum(residual_arr), sum(lmf.residual)
     dic2['residual'] = residual_arr
     chisqr = sum(residual_arr**2)
@@ -253,7 +227,6 @@ def unpack_global2(P_arr,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None,lmf=None):
     #dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
     return(dic2)
 #################################################
-############ Stat functions
 def Ftest(ss1,df1,ss2,df2):
     ## KTE: R1rhoAnalysis.ipf. Line 364.
     #fRatio = ((ss1-ss2)/(df1-df2))/(ss2/df2) # fRatio = ((ss1-ss2)/(df1-df2))/(ss2/df2)  -  Fval=(WSSR1mWSSR2/P2mP1)/(WSSR2val/NmP2)
@@ -272,7 +245,6 @@ def Ftest(ss1,df1,ss2,df2):
     #print Pvalue, Pval, (Pvalue-Pval)
     return Fval, Fdist, Pval
 
-############ Misc. functions
 def f5(seq, idfun=None):
    # order preserving. http://www.peterbe.com/plog/uniqifiers-benchmark
    if idfun is None:
@@ -286,7 +258,7 @@ def f5(seq, idfun=None):
        result.append(item)
    return result
 
-############# Data import
+#################################################
 def getstat(dic,dt):
     startTime = datetime.now()
     fpath = dic['path']
@@ -476,7 +448,7 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
     for dic in dics:
         if not mets: mets = dic['qMDDmet'][0]
         for met in mets:
-            if not NIarr: NIarr = dic['NIarr'][met] # NIarr = [dic['NImax'][met]]
+            if not NIarr: NIarr = list(dic['NIarr'][met][:2]) # [dic['NImax'][met]] #
             for NI in NIarr:
                 if not peaks: peaks = ['1']
                 #print peaks, type(peaks)
@@ -509,6 +481,8 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
     return()
 
 def getrates(dic,mets=False,NIstop=False):
+    startTime = datetime.now()
+    print "Getting exchange rates"
     dic['rates'] = {}
     slicet = len(dic['time'])
     if not mets: mets = dic['qMDDmet'][0]
@@ -524,7 +498,7 @@ def getrates(dic,mets=False,NIstop=False):
             else:
                 if NI <= dic['NIstop']: break
                 else: pass
-            print "%s - Getting rates for NI=%s"%(met,NI)
+            #print "%s - Getting rates for NI=%s"%(met,NI)
             dic['rates'][met][str(NI)] = {}
             Pval_peaks = []
             for peak in dic['peakrange'][met]:
@@ -591,6 +565,7 @@ def getrates(dic,mets=False,NIstop=False):
             dic['rates'][met][str(NI)]['Pval_peaks'] = Pval_peaks
             print "Following peak numbers passed the Ftest. Met:%s NI=%s."%(met, NI)
             print "Peaks:%s"%(Pval_peaks)
+    print "Done exchange rates. It took: %s"%(datetime.now()-startTime)
     return()
 
 def plotrates(dics,mets=False,peaks=False,NIarr=False):
@@ -601,7 +576,7 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
             if not peaks: peaks = dic['peakrange'][met]
             if not NIarr: NIarr = [dic['NImax'][met]]
             for NI in NIarr:
-                figR1r = figure('R1r %s'%NI)
+                figR1r = figure('R1r %s'%NI,figsize=(figsize, figsize/1.618))
                 ax = figR1r.add_subplot(111)
                 for peak in peaks:
                     dc = dic['rates'][met][str(NI)][str(peak)]
@@ -625,7 +600,7 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
                         ax.plot(datX_f_R1r,calcR1r,"o",mfc='none',mec=ax.lines[-1].get_color())#
                         #ax.plot(datXs_f_R1r_lin,datYs_f_R1r_lin,"-",color=ax.lines[-1].get_color())
                     if Pval!=False:
-                        figR1r_exch = figure('R1r_exch %s %s'%(NI,peak))
+                        figR1r_exch = figure('R1r_exch %s %s'%(NI,peak),figsize=(figsize, figsize/1.618))
                         bx = figR1r_exch.add_subplot(111)
                         # Get values for R1r_exch
                         X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
@@ -656,7 +631,7 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
                         bx.set_xlabel('Tilt angle')
                         bx.set_ylabel('R1r_coef')
                         box = bx.get_position()
-                        bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+                        bx.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
                         bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
                         bx.grid('on')
                 #R1r graph
@@ -664,7 +639,7 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
                 ax.set_xlabel('Tilt angle')
                 ax.set_ylabel('R1r_coef')
                 box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+                ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
                 ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
                 ax.grid('on')
     show()
@@ -747,16 +722,16 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                 datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
                 datY_f_R1r_exch_err = X_Y_Sigma_Fit_exch[2]
                 dic_R1r_exch_glob = unpack_f_R1r_exch(par_calc,datX_f_R1r_exch,datY_f_R1r_exch,datY_f_R1r_exch_err,lmf_R1r_exch_glob)
-                dic['gfit'][met][str(NI)][str(peak)]['R1r_exch'] = {}
-                dic['gfit'][met][str(NI)][str(peak)]['R1r_exch'].update(dic_R1r_exch_glob)
-            dic_glob = unpack_global2(P_arr,sel_p,tilt,om1,R1rex,R1rex_err,lmf_R1r_exch_glob)
-            #dic['gfit'][met][str(NI)]['R1r'].update(dic_glob)
+                dic['gfit'][met][str(NI)][str(p)]['R1r_exch'] = {}
+                dic['gfit'][met][str(NI)][str(p)]['R1r_exch'].update(dic_R1r_exch_glob)
+            dic_glob = unpack_global(P_arr,sel_p,tilt,om1,R1rex,R1rex_err,lmf_R1r_exch_glob)
+            dic['gfit'][met][str(NI)].update(dic_glob)
 
             print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr-lmf=%4.4f, chisqr-calc=%4.4f"%(met,NI,kEX_glob.value,lmf_R1r_exch_glob.chisqr, dic_glob['chisqr'])
     return()
 
 def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
-    fig = figure()
+    fig = figure(figsize=(figsize, figsize/1.618))
     ax = fig.add_subplot(211)
     bx = fig.add_subplot(212)
     for dic in dics:
@@ -776,9 +751,9 @@ def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
                     if NI <= dic['NIstop']: break
                     else: pass
                 gf = dic['gfit'][met][str(NI)]
-                kEX = gf['par']['kEX'].value
-                kEX_e = gf['par']['kEX'].stderr
-                chisqr = gf['lmf'].chisqr
+                kEX = gf['par']['kEX_v']
+                kEX_e = gf['par']['kEX_e']
+                chisqr = gf['chisqr']
                 NI_X.append(NI)
                 kEX_Y.append(kEX)
                 kEX_Y_e.append(kEX_e)
@@ -792,12 +767,21 @@ def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
     ax.plot(NI_X,ones(len(NI_X))*kEX_Y[0],c='k')
     bx.plot(NI_X,ones(len(NI_X))*chisqr_Y[0],c='k')
     ax.set_title('Global kEX fitting')
+    #
     ax.set_ylabel('kEX')
-    ax.set_ylim(10000,20000)
-    ax.legend(loc='upper left')
+    ax.set_ylim(8000,16000)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+    ax.grid('on')
+    #
     bx.set_ylabel('chisqr')
-    bx.set_ylim(500,5000)
+    bx.set_ylim(0,5000)
     bx.set_xlabel('Sparseness')
-    bx.legend(loc='upper left')
+    box = bx.get_position()
+    bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
+    bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+    bx.grid('on')
+
     show()
     return()

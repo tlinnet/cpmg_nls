@@ -28,14 +28,14 @@ from handythread import foreach
 #############################################################################
 limit = 0.6   # Limit set for chisq test, to select peaks
 jobs = multiprocessing.cpu_count()-1
-nr_gen_datapeaks = 6000
+nr_gen_datapeaks = 200
 
 # Directory for saving
 outdir = os.path.join(os.getcwd(),'data')
 if not os.path.exists(outdir): os.mkdir(outdir)
-data_format = 'pickle' # 'pickle' 'yaml'
-load_data = False #True False
-save_data = False
+data_format = 'yaml' # 'pickle' 'yaml'
+load_data = True #True False
+save_data = True
 
 multi = 1
 if multi==1:
@@ -272,8 +272,8 @@ def main():
         lmf = lmfit.minimize(err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
         print "Done with global fit %s"%(datetime.now()-startTime)
     elif multi == 1:
-        lmf = lmfit.minimize(multi_err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
-        #lmf = lmfit.minimize(err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
+        #lmf = lmfit.minimize(multi_err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
+        lmf = lmfit.minimize(err_global, P_arr, args=(X_arr, Y_arr, sel_p),method='leastsq')
 
     #Unpack results
     for i in range(len(sel_p)):
@@ -300,11 +300,11 @@ def main():
 
     #Saving data
     if data_format == 'pickle' and save_data:
-        pickle.dump( dic, open( os.path.join(outdir,"test_dic.pickle"), "wb" ) )
-        pickle.dump( pd, open( os.path.join(outdir,"test_pd.pickle"), "wb" ) )
+        pickle.dump(dic open( os.path.join(outdir,"test_dic.pickle"),"wb"))
+        pickle.dump(pd,open( os.path.join(outdir,"test_pd.pickle"),"wb"))
     elif data_format == 'yaml' and save_data:
-        yaml.dump( dic, open( os.path.join(outdir,"test_dic.yaml"), "w" ) )
-        yaml.dump( pd, open( os.path.join(outdir,"test_pd.yaml"), "w" ) )
+        yaml.dump(dic,open( os.path.join(outdir,"test_dic.yaml"),"w"))
+        yaml.dump(pd,open( os.path.join(outdir,"test_pd.yaml"),"w"))
     print "Making figure %s"%(datetime.now()-startTime)
     #plotfunction(dic,pd)
 
@@ -314,9 +314,9 @@ if __name__ == "__main__":
         main()
     elif load_data:
         if data_format == 'pickle':
-            dic = pickle.load( open( os.path.join(outdir,"test_dic.pickle"), "rb" ) )
-            pd = pickle.load( open( os.path.join(outdir,"test_pd.pickle"), "rb" ) )
+            dic = pickle.load(open(os.path.join(outdir,"test_dic.pickle"),"rb"))
+            pd = pickle.load(open(os.path.join(outdir,"test_pd.pickle"),"rb"))
         elif data_format == 'yaml':
-            dic = pickle.load( open( os.path.join(outdir,"test_dic.pickle"), "rb" ) )
-            pd = pickle.load( open( os.path.join(outdir,"test_pd.pickle"), "rb" ) )
+            dic = yaml.load(open(os.path.join(outdir,"test_dic.yaml"),"r"))
+            pd = yaml.load(open(os.path.join(outdir,"test_pd.yaml"),"r"))
         plotfunction(dic,pd)
