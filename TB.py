@@ -26,8 +26,8 @@ figfont = 12
 #import warnings
 #warnings.simplefilter('error')
 
-############ Fit functions
-###################### expdecay ################
+####################################### Fit functions ##################################
+#################################################
 def f_expdecay(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
     amp = pars['amp'].value
     decay = pars['decay'].value
@@ -95,13 +95,14 @@ def f_R1r_calc(par,tiltAngle):
     model = R1*cos(tiltAngle*pi/180.0)**2+R2*sin(tiltAngle*pi/180.0)**2
     return model
 
-def unpack_f_R1r(par,X,Y,sigma,lmf):
+def unpack_f_R1r(par,X,Y,sigma,lmf=None):
     dic2 = {}
-    Yfit = f_R1r(par,X)
-    dic2['Yfit']=Yfit
     dic2['par']={}
     dic2['par']['R1_v'] = par['R1'].value; dic2['par']['R1_e'] = par['R1'].stderr
     dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
+#    Yfit = f_R1r(par,X)
+    Yfit = f_R1r_calc(dic2['par'],X) #Should be faster
+    dic2['Yfit']=Yfit
     residual = Yfit - Y
     #print sum(residual - lmf.residual)
     dic2['residual'] = residual
@@ -116,7 +117,7 @@ def unpack_f_R1r(par,X,Y,sigma,lmf):
     x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
     dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
     return(dic2)
-########################
+#################################################
 def f_R1r_exch(pars,inp,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
     #http://newville.github.com/lmfit-py/fitting.html
     tiltAngle,omega1=inp
@@ -140,14 +141,16 @@ def f_R1r_exch_calc(par,inp):
     model = R1*cos(tiltAngle*pi/180)**2+(R2+phi*kEX/((2*pi*omega1/tan(tiltAngle*pi/180))**2+(2*pi*omega1)**2+kEX**2))*sin(tiltAngle*pi/180)**2
     return model
 
-def unpack_f_R1r_exch(par,X,Y,sigma,lmf):
+def unpack_f_R1r_exch(par,X,Y,sigma,lmf=None):
     dic2 = {}
-    Yfit = f_R1r_exch(par,X)
     dic2['par']={}
     dic2['par']['R1_v'] = par['R1'].value; dic2['par']['R1_e'] = par['R1'].stderr
     dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
     dic2['par']['kEX_v'] = par['kEX'].value; dic2['par']['kEX_e'] = par['kEX'].stderr
     dic2['par']['phi_v'] = par['phi'].value; dic2['par']['phi_e'] = par['phi'].stderr
+#    Yfit = f_R1r_exch(par,X)
+    Yfit = f_R1r_exch_calc(dic2['par'],X) #Should be faster
+    dic2['Yfit']=Yfit
     residual = Yfit - Y
     #print sum(residual - lmf.residual)
     dic2['residual'] = residual
@@ -162,26 +165,24 @@ def unpack_f_R1r_exch(par,X,Y,sigma,lmf):
     x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
     dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
     return(dic2)
-#########################
+#################################################
 def f_R1r_exch_global(pars,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None):
     toterr = np.array([])
     for i in range(len(sel_p)):
         p = sel_p[i]
-        tilt =tilt_a[i];om1=om1_a[i];R1rex=R1rex_a[i];R1rex_err=R1rex_err_a[i]
-        par = lmfit.Parameters()
-        par.add('kEX', value=pars['kEX'].value, vary=True, min=0.0)
-        par.add('R1', value=pars['R1%s'%p].value, vary=True, min=0.0)
-        par.add('R2', value=pars['R2%s'%p].value, vary=True, min=0.0)
-        par.add('phi', value=pars['phi%s'%p].value, vary=True, min=0.0)
+        tilt =tilt_a[i];om1=om1_a[i];R1rex=R1rex_a[i]
+        if R1rex_err_a is not None:
+            R1rex_err=R1rex_err_a[i]
+        # Much faster to use a dictionary, and pass to a calc function.
+        par = {'kEX_v':pars['kEX'].value,'R1_v':pars['R1%s'%p].value,'R2_v':pars['R2%s'%p].value,'phi_v':pars['phi%s'%p].value}
         datX = [array(tilt), array(om1)]
-        Yfit = f_R1r_exch(par,datX)
+        Yfit = f_R1r_exch_calc(par,datX)
         if R1rex_err_a is None:
             erri = Yfit - R1rex
         else:
             erri = (Yfit - R1rex)/R1rex_err
         toterr = np.concatenate((toterr, erri))
-    #print par['kEX']
-    return (toterr)
+    return toterr
 
 def unpack_global(dic, p_list, met, NI):
     for i in range(len(p_list)):
@@ -212,6 +213,46 @@ def unpack_global(dic, p_list, met, NI):
         #lmfit.printfuncs.report_errors(par)
     return()
 
+def unpack_global2(P_arr,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None,lmf=None):
+    dic2 = {}
+    residual_arr = np.array([])
+    for i in range(len(sel_p)):
+        p = sel_p[i]
+        tilt =tilt_a[i];om1=om1_a[i];R1rex=R1rex_a[i]
+        if R1rex_err_a is not None:
+            R1rex_err=R1rex_err_a[i]
+        #par = lmfit.Parameters()
+        kEX_glob = P_arr['kEX']
+        R1 = P_arr['R1%s'%p]
+        R2 = P_arr['R2%s'%p]
+        phi = P_arr['phi%s'%p]
+        #par['kEX'] = kEX_glob; par['R1'] = R1; par['R2'] = R2; par['phi'] = phi
+        #print "Peak %s .chisqr=%3.2f. kEX= "%(p,chisqr,kEX.value)
+        #lmfit.printfuncs.report_errors(par)
+        dic2['par']={}
+        dic2['par']['kEX_v'] = kEX_glob.value; dic2['par']['kEX_e'] = kEX_glob.stderr
+        dic2['par']['R1_v'] = R1.value; dic2['par']['R1_e'] = R1.stderr
+        dic2['par']['R2_v'] = R2.value; dic2['par']['R2_e'] = R2.stderr
+        dic2['par']['phi_v'] = phi.value; dic2['par']['phi_e'] = phi.stderr
+        datX = [array(tilt), array(om1)]
+        #Yfit = f_R1r_exch(par,datX)
+        Yfit = f_R1r_exch_calc(dic2['par'],datX)
+        residual = Yfit - R1rex
+        residual_arr = np.concatenate((residual_arr, residual))
+    #print sum(residual_arr), sum(lmf.residual)
+    dic2['residual'] = residual_arr
+    chisqr = sum(residual_arr**2)
+    #print chisqr, lmf.chisqr, sum(lmf.residual**2)
+    dic2['chisqr'] = chisqr
+    NDF = len(residual_arr)-len(P_arr)
+    #print NDF, lmf.nfree
+    dic2['NDF'] = NDF
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    #x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
+    #dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
+    return(dic2)
+#################################################
 ############ Stat functions
 def Ftest(ss1,df1,ss2,df2):
     ## KTE: R1rhoAnalysis.ipf. Line 364.
@@ -681,20 +722,37 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                     R1rex.append(datY_f_R1r_exch)
                     R1rex_err.append(datY_f_R1r_exch_err)
                     P_arr.add('R1%s'%peak, value=R1, vary=True, min=0.0)
-                    P_arr.add('R2%s'%peak, value=F2, vary=True, min=0.0)
+                    P_arr.add('R2%s'%peak, value=R2, vary=True, min=0.0)
                     P_arr.add('phi%s'%peak, value=phi, vary=True, min=0.0)
                     sel_p.append(peak)
                     dic['gfit'][met][str(NI)][str(peak)]['resn'] = peakname
             dic['gfit'][met][str(NI)]['gfit_peaks'] = sel_p
-            lmf = lmfit.minimize(f_R1r_exch_global, P_arr, args=(sel_p,tilt,om1,R1rex,R1rex_err),method='leastsq')
-            dic_glob = unpack_global2(P_arr,datX_f_R1r,datY,f_sigma,lmf_R1r)
-            dic['gfit'][met][str(NI)]['R1r'].update(dic_glob)
+            # Do global fit
+            lmf_R1r_exch_glob = lmfit.minimize(f_R1r_exch_global, P_arr, args=(sel_p,tilt,om1,R1rex,R1rex_err),method='leastsq')
+            # Unpack result into each peak
+            for i in range(len(sel_p)):
+                p = sel_p[i]
+                dc = dic['rates'][met][str(NI)][str(p)]
+                kEX_glob = P_arr['kEX']
+                R1 = P_arr['R1%s'%p]
+                R2 = P_arr['R2%s'%p]
+                phi = P_arr['phi%s'%p]
+                par_calc = lmfit.Parameters()
+                par_calc['kEX'] = kEX_glob
+                par_calc['R1'] = R1
+                par_calc['R2'] = R2
+                par_calc['phi'] = phi
+                X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
+                datX_f_R1r_exch = X_Y_Sigma_Fit_exch[0]
+                datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
+                datY_f_R1r_exch_err = X_Y_Sigma_Fit_exch[2]
+                dic_R1r_exch_glob = unpack_f_R1r_exch(par_calc,datX_f_R1r_exch,datY_f_R1r_exch,datY_f_R1r_exch_err,lmf_R1r_exch_glob)
+                dic['gfit'][met][str(NI)][str(peak)]['R1r_exch'] = {}
+                dic['gfit'][met][str(NI)][str(peak)]['R1r_exch'].update(dic_R1r_exch_glob)
+            dic_glob = unpack_global2(P_arr,sel_p,tilt,om1,R1rex,R1rex_err,lmf_R1r_exch_glob)
+            #dic['gfit'][met][str(NI)]['R1r'].update(dic_glob)
 
-            #dic['gfit'][met][str(NI)]['par']= P_arr
-            #dic['gfit'][met][str(NI)]['lmf']= lmf
-            #unpack_global2(dic, sel_p, met, NI) # Unpack the paramerts into the selected peaks
-            #print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr=%4.4f"%(met,NI,P_arr['kEX'].value,lmf.chisqr)
-            #print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr=%4.4f"%(met,NI,P_arr['kEX'].value,lmf.chisqr)
+            print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr-lmf=%4.4f, chisqr-calc=%4.4f"%(met,NI,kEX_glob.value,lmf_R1r_exch_glob.chisqr, dic_glob['chisqr'])
     return()
 
 def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
