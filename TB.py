@@ -2,17 +2,12 @@ from pylab import *
 import numpy
 import scipy.optimize
 import scipy.stats.distributions
+from datetime import datetime
 import os
 import lmfit #See http://newville.github.com/lmfit-py/parameters.html
-
-#### Standard size of some figures
-figsize = 16
-titfont = 26
-labfont = 12
-figfont = 12
+from multiprocessing import Pool
 
 ###### To print out to both screen and log file
-import sys
 class Logger(object):
     def __init__(self, filename="Default.log"):
         self.terminal = sys.stdout
@@ -20,25 +15,70 @@ class Logger(object):
     def write(self, message):
         self.terminal.write(message)
         self.log.write(message)
-sys.stdout = Logger("Log_file.txt")
+
+#### Standard size of some figures
+figsize = 16
+titfont = 26
+labfont = 12
+figfont = 12
 
 ##### To handle "RuntimeWarning" from fitting functions to be handled as errors
 #import warnings
 #warnings.simplefilter('error')
 
 ############ Fit functions
-def f_expdecay_lmfit(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
+###################### expdecay ################
+def f_expdecay(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
     amp = pars['amp'].value
     decay = pars['decay'].value
-#    try:
     model = amp*exp(-decay*time)
-#    except (RuntimeError, ValueError, RuntimeWarning, UnboundLocalError) as e:
-#        print "Cannot fit expdecay. Reason: %s"%(e)
     if data is None:
         return model
     return (model-data)
 
-def f_R1r_lmfit(pars,tiltAngle,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
+def f_expdecay_calc(inp):
+    par,time = inp
+    amp = par['amp_v']
+    decay = par['decay_v']
+    model = amp*exp(-decay*time)
+    return model
+
+def multi_f_expdecay(inp):
+    par = inp[0]
+    X=inp[1]
+    Y=inp[2]
+    parlmf = lmfit.Parameters();
+    parlmf.add('amp', value=par['amp_v'], vary=True)
+    parlmf.add('decay', value=par['decay_v'], vary=True, min=par['decay_min'])
+    lmf = lmfit.minimize(f_expdecay, parlmf, args=(X, Y),method='leastsq')
+    dic2 = unpack_f_expdecay(parlmf,X,Y)
+    return(dic2)
+
+def unpack_f_expdecay(par,X,Y,lmf):
+    dic2 = {}
+    Yfit = f_expdecay(par,X)
+    dic2['Yfit']=Yfit
+    dic2['par']={}
+    dic2['par']['amp_v'] = par['amp'].value; dic2['par']['amp_e'] = par['amp'].stderr
+    dic2['par']['decay_v'] = par['decay'].value; dic2['par']['decay_e'] = par['decay'].stderr
+    dic2['R1r_rates'] = par['decay'].value
+    dic2['R1r_err'] = par['decay'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    dic2['NDF'] = NDF
+    #print NDF, lmf.nfree
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_fit = array([X,Y,Yfit]).T
+    dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
+#################################################
+def f_R1r(pars,tiltAngle,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
     #http://newville.github.com/lmfit-py/fitting.html
     R1 = pars['R1'].value
     R2 = pars['R2'].value
@@ -49,7 +89,35 @@ def f_R1r_lmfit(pars,tiltAngle,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Lin
         return (model - data)
     return (model-data)/eps
 
-def f_R1r_exch_lmfit(pars,inp,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
+def f_R1r_calc(par,tiltAngle):
+    R1 = par['R1_v']
+    R2 = par['R2_v']
+    model = R1*cos(tiltAngle*pi/180.0)**2+R2*sin(tiltAngle*pi/180.0)**2
+    return model
+
+def unpack_f_R1r(par,X,Y,sigma,lmf):
+    dic2 = {}
+    Yfit = f_R1r(par,X)
+    dic2['Yfit']=Yfit
+    dic2['par']={}
+    dic2['par']['R1_v'] = par['R1'].value; dic2['par']['R1_e'] = par['R1'].stderr
+    dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    #print NDF, lmf.nfree
+    dic2['NDF'] = NDF
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
+    dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
+    return(dic2)
+########################
+def f_R1r_exch(pars,inp,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line 144. Use see line 96
     #http://newville.github.com/lmfit-py/fitting.html
     tiltAngle,omega1=inp
     R1 = pars['R1'].value
@@ -63,6 +131,38 @@ def f_R1r_exch_lmfit(pars,inp,data=None,eps=None): #KTE: R1rhoAnalysis.ipf. Line
         return (model - data)
     return (model-data)/eps
 
+def f_R1r_exch_calc(par,inp):
+    tiltAngle,omega1=inp
+    R1 = par['R1_v']
+    R2 = par['R2_v']
+    kEX = par['kEX_v']
+    phi = par['phi_v']
+    model = R1*cos(tiltAngle*pi/180)**2+(R2+phi*kEX/((2*pi*omega1/tan(tiltAngle*pi/180))**2+(2*pi*omega1)**2+kEX**2))*sin(tiltAngle*pi/180)**2
+    return model
+
+def unpack_f_R1r_exch(par,X,Y,sigma,lmf):
+    dic2 = {}
+    Yfit = f_R1r_exch(par,X)
+    dic2['par']={}
+    dic2['par']['R1_v'] = par['R1'].value; dic2['par']['R1_e'] = par['R1'].stderr
+    dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
+    dic2['par']['kEX_v'] = par['kEX'].value; dic2['par']['kEX_e'] = par['kEX'].stderr
+    dic2['par']['phi_v'] = par['phi'].value; dic2['par']['phi_e'] = par['phi'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    #print NDF, lmf.nfree
+    dic2['NDF'] = NDF
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
+    dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
+    return(dic2)
+#########################
 def f_R1r_exch_global(pars,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None):
     toterr = np.array([])
     for i in range(len(sel_p)):
@@ -74,7 +174,7 @@ def f_R1r_exch_global(pars,sel_p,tilt_a,om1_a,R1rex_a,R1rex_err_a=None):
         par.add('R2', value=pars['R2%s'%p].value, vary=True, min=0.0)
         par.add('phi', value=pars['phi%s'%p].value, vary=True, min=0.0)
         datX = [array(tilt), array(om1)]
-        Yfit = f_R1r_exch_lmfit(par,datX)
+        Yfit = f_R1r_exch(par,datX)
         if R1rex_err_a is None:
             erri = Yfit - R1rex
         else:
@@ -97,7 +197,7 @@ def unpack_global(dic, p_list, met, NI):
         # Calc other parameters for the fit
         datX_f_R1r_exch = dic['rates'][met][str(NI)][str(p)]['R1r_exch']['data'][0]
         datY_f_R1r_exch = dic['rates'][met][str(NI)][str(p)]['R1r_exch']['data'][1]
-        Yfit = f_R1r_exch_lmfit(par,datX_f_R1r_exch)
+        Yfit = f_R1r_exch(par,datX_f_R1r_exch)
         dic['gfit'][met][str(NI)][str(p)]['Yfit'] = Yfit
         residual = Yfit - datY_f_R1r_exch
         dic['gfit'][met][str(NI)][str(p)]['residual'] = residual
@@ -147,6 +247,7 @@ def f5(seq, idfun=None):
 
 ############# Data import
 def getstat(dic,dt):
+    startTime = datetime.now()
     fpath = dic['path']
     dic['stats']['data'] = {}
     dic['NIarr']={}
@@ -160,9 +261,11 @@ def getstat(dic,dt):
         NIarr = data[:,0].astype(int)
         dic['NIarr'][met] = NIarr
         dic['NImax'][met] = max(NIarr)
+    print "Done getting stat file. It took: %s"%(datetime.now()-startTime)
     return()
 
 def getser(dic,dt):
+    startTime = datetime.now()
     fpath = dic['path']
     dic['ser']['data'] = {}
     dic['ser']['datas'] = {}
@@ -178,9 +281,11 @@ def getser(dic,dt):
         dic['ser']['datas'][met] = datas
         dic['peakrange'][met] = range(int(data[:,0][0]),int(data[:,0][-1]+1))
         dic['filenr'][met] = int(data[:,0].size/len(dic['peakrange'][met]))
+    print "Done getting ser file. It took: %s"%(datetime.now()-startTime)
     return()
 #############################################
 def sortInt(dic,dt):
+    startTime = datetime.now()
     dic['Int'] = {}
     for met in dt:
         dic['Int'][met] = {}
@@ -206,6 +311,7 @@ def sortInt(dic,dt):
                 NI = str(NIs[k])
                 NIint = data[:,8+k][j::pm]
                 dic['Int'][met][peak]['NIInt'][NI] = NIint
+    print "Done sorting intensities. It took: %s"%(datetime.now()-startTime)
     return()
 
 def plotstats(dics,dt):
@@ -228,6 +334,10 @@ def plotstats(dics,dt):
     return()
 
 def getdecay(dic,mets=False,NIstop=False):
+    startTime = datetime.now()
+    multiprocess = dic['Flags']['multiprocess']
+    multi_inp_arr = []
+    multi_sort_arr = []
     datX = dic['time']
     centerPPM = dic['NMRpar']['centerPPM']
     frq = dic['NMRpar']['frq']
@@ -246,7 +356,7 @@ def getdecay(dic,mets=False,NIstop=False):
             else:
                 if NI <= dic['NIstop']: break
                 else: pass
-            print "%s - Getting decay for NI=%s"%(met,NI)
+            print "%s - Getting decay rates for NI=%s"%(met,NI)
             dic['decay'][met][str(NI)] = {}
             for peak in dic['peakrange'][met]:
             #for peak in ['1']:
@@ -268,20 +378,16 @@ def getdecay(dic,mets=False,NIstop=False):
                     par = lmfit.Parameters()
                     par.add('amp', value=1.0, vary=True, min=0.0)
                     par.add('decay', value=10.0, vary=True, min=0.0)
-                    try:
-                        lmf = lmfit.minimize(f_expdecay_lmfit, par, args=(datX, datY),method='leastsq')
-                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['par'] = par
-                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['lmf'] = lmf
-                        #fitY = datY+lmf.residual
-                        fitY = f_expdecay_lmfit(par,datX)
-                        R1r_rates = par['decay'].value
-                        R1r_err = par['decay'].stderr
-                        x_y_fit_resi = array([datX,datY,fitY]).T
-                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'] = x_y_fit_resi
-                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_rates'] = R1r_rates
-                        dic['decay'][met][str(NI)][str(peak)][str(fs)]['R1r_err'] = R1r_err
-                    except (Exception) as e:
-                        print "Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e)
+                    parmulti = {'amp_v':1.0,'decay_v':10.0,'decay_min':0.0}
+                    multi_inp_arr.append([parmulti,datX,datY])
+                    multi_sort_arr.append([met,NI,peak,fs])
+                    if not multiprocess:
+                        try:
+                            lmf = lmfit.minimize(f_expdecay, par, args=(datX, datY),method='leastsq')
+                            dic2 = unpack_f_expdecay(par,datX,datY,lmf)
+                            dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dic2)
+                        except (Exception) as e:
+                            print "Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e)
                     # Setting keys
                     offset = dic['offset'][i]
                     omega1 = dic['omega1'][i]
@@ -305,6 +411,20 @@ def getdecay(dic,mets=False,NIstop=False):
                     dic['decay'][met][str(NI)][str(peak)][str(fs)]['omegaEFF'] = omegaEFF
                     dic['decay'][met][str(NI)][str(peak)][str(fs)]['theta'] = theta #theta/tiltAngle
                     i+=1
+    if multiprocess:
+        print "Doing multiprocess fitting for decay rates"
+        pool = Pool(processes=dic['Flags']['multiprocess'])
+        multi_res = pool.map(multi_f_expdecay, multi_inp_arr) 
+        #from handythread import foreach
+        #multi_res = foreach(multi_f_expdecay,multi_inp_arr,threads=dic['Flags']['multiprocess'],return_=True)
+        for i in range(len(multi_sort_arr)):
+            multi_sort = multi_sort_arr[i]
+            met = multi_sort[0]; NI = multi_sort[1]
+            peak = multi_sort[2]; fs = multi_sort[3]
+            multi_sort[1]
+            dic2 = multi_res[i]
+            dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dic2)
+    print "Done with Getting decay rates. It took: %s"%(datetime.now()-startTime)
     return()
 
 def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
@@ -315,24 +435,25 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
     for dic in dics:
         if not mets: mets = dic['qMDDmet'][0]
         for met in mets:
-            if not NIarr: NIarr = dic['NImax'][met]
+            if not NIarr: NIarr = dic['NIarr'][met] # NIarr = [dic['NImax'][met]]
             for NI in NIarr:
                 if not peaks: peaks = ['1']
-                print peaks, type(peaks)
+                #print peaks, type(peaks)
                 for peak in peaks:
                     peakname = dic['decay'][met][str(NI)][str(peak)]['resn']
                     for fs in fss:
-                        datX = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,0]
-                        datY = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,1]
-                        fitY = dic['decay'][met][str(NI)][str(peak)][str(fs)]['data'][:,2]
+                        X_Y_Fit = dic['decay'][met][str(NI)][str(peak)][str(fs)]['X_Y_Fit']
+                        datX = X_Y_Fit[:,0]
+                        datY = X_Y_Fit[:,1]
+                        fitY = X_Y_Fit[:,2]
                         par = dic['decay'][met][str(NI)][str(peak)][str(fs)]['par']
-                        a = par['amp'].value
-                        a_e = par['amp'].stderr
-                        b = par['decay'].value
-                        b_e = par['decay'].stderr
+                        a = par['amp_v']
+                        a_e = par['amp_e']
+                        b = par['decay_v']
+                        b_e = par['decay_e']
                         datXs = sort(datX)
                         fitXlin = linspace(datXs[0],datXs[-1],100)
-                        fitYlin = f_expdecay_lmfit(par,fitXlin)
+                        fitYlin = f_expdecay_calc([par,fitXlin])
                         ax.plot(datX,datY,".",label='%s %s %s %s. fit [a*exp(-b*x]: a=%3.2f +-%3.2f, a=%3.2f +-%3.2f '%(met, peakname, NI, fs, a,a_e,b,b_e))
                         ax.plot(fitXlin,fitYlin,"-",color=ax.lines[-1].get_color())
                         ax.plot(datX,fitY,"o",mfc='none',mec=ax.lines[-1].get_color())
@@ -394,17 +515,15 @@ def getrates(dic,mets=False,NIstop=False):
                 # Calculate for R1r
                 try:
                     par_R1r = lmfit.Parameters()
-                    par_R1r.add('R1', value=2.0, vary=True, min=0.0)
-                    par_R1r.add('R2', value=23.0, vary=True, min=0.0)
-                    lmf_R1r = lmfit.minimize(f_R1r_lmfit, par_R1r, args=(datX_f_R1r, datY, f_sigma),method='leastsq')
-                    dic['rates'][met][str(NI)][str(peak)]['R1r']['par'] = par_R1r
-                    dic['rates'][met][str(NI)][str(peak)]['R1r']['lmf'] = lmf_R1r
-                    #calcR1r = datY+lmf_R1r.residual    # NOT WORKING?
-                    calcR1r = f_R1r_lmfit(par_R1r,datX_f_R1r)
-                    x_y_fit_resi = array([datX_f_R1r,datY,f_sigma,calcR1r]).T
-                    dic['rates'][met][str(NI)][str(peak)]['R1r']['data'] = x_y_fit_resi
+                    par_R1r.add('R1', value=dic['guess']['s_R1'], vary=True, min=0.0)
+                    par_R1r.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    lmf_R1r = lmfit.minimize(f_R1r, par_R1r, args=(datX_f_R1r, datY, f_sigma),method='leastsq')
+                    dic_R1r = unpack_f_R1r(par_R1r,datX_f_R1r,datY,f_sigma,lmf_R1r)
+                    dic['rates'][met][str(NI)][str(peak)]['R1r'].update(dic_R1r)
+                    OK_R1r = True
                 except (Exception) as e:
                     print "Cannot fit R1r for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    OK_R1r = False
                 # Calculate for R1r_exch
                 try:
                     par_R1r_exch = lmfit.Parameters()
@@ -412,17 +531,15 @@ def getrates(dic,mets=False,NIstop=False):
                     par_R1r_exch.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
                     par_R1r_exch.add('kEX', value=dic['guess']['s_kEX'], vary=True, min=0.0)
                     par_R1r_exch.add('phi', value=dic['guess']['s_phi'], vary=True, min=0.0)
-                    #print par_R1r_exch['kEX'].value, par_R1r_exch['kEX'].min
-                    lmf_R1r_exch = lmfit.minimize(f_R1r_exch_lmfit, par_R1r_exch, args=(datX_f_R1r_exch, datY, f_sigma),method='leastsq')
-                    dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['par'] = par_R1r_exch
-                    dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['lmf'] = lmf_R1r_exch
-                    #calcR1r_exch = datY+lmf_R1r_exch.residual    # NOT WORKING?
-                    calcR1r_exch = f_R1r_exch_lmfit(par_R1r_exch,datX_f_R1r_exch)
-                    x_y_fit_resi = array([datX_f_R1r_exch,datY,f_sigma,calcR1r_exch]).T
-                    dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['data'] = x_y_fit_resi
-                    Fval, Fdist, Pval = Ftest(lmf_R1r.chisqr,lmf_R1r.nfree,lmf_R1r_exch.chisqr,lmf_R1r_exch.nfree)
+                    lmf_R1r_exch = lmfit.minimize(f_R1r_exch, par_R1r_exch, args=(datX_f_R1r_exch, datY, f_sigma),method='leastsq')
+                    dic_R1r_exch = unpack_f_R1r_exch(par_R1r_exch,datX_f_R1r_exch,datY,f_sigma,lmf_R1r_exch)
+                    dic['rates'][met][str(NI)][str(peak)]['R1r_exch'].update(dic_R1r_exch)
+                    OK_R1r_exch = True
                 except (Exception) as e:
                     print "Cannot fit R1r_exch NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    OK_R1r_exch = False
+                if OK_R1r and OK_R1r_exch:
+                    Fval, Fdist, Pval = Ftest(dic_R1r['chisqr'],dic_R1r['NDF'],dic_R1r_exch['chisqr'],dic_R1r_exch['NDF'])
                 dic['rates'][met][str(NI)][str(peak)]['Fval'] = Pval
                 dic['rates'][met][str(NI)][str(peak)]['Fdist'] = Fdist
                 dic['rates'][met][str(NI)][str(peak)]['Pval'] = Pval
@@ -431,7 +548,8 @@ def getrates(dic,mets=False,NIstop=False):
                 elif Pval!=False:
                     Pval_peaks.append(peak)
             dic['rates'][met][str(NI)]['Pval_peaks'] = Pval_peaks
-            print "Following peak numbers passed the Ftest. NI=%s. Peaks:%s"%(NI, Pval_peaks)
+            print "Following peak numbers passed the Ftest. Met:%s NI=%s."%(met, NI)
+            print "Peaks:%s"%(Pval_peaks)
     return()
 
 def plotrates(dics,mets=False,peaks=False,NIarr=False):
@@ -449,45 +567,46 @@ def plotrates(dics,mets=False,peaks=False,NIarr=False):
                     peakname = dc['resn']
                     Pval = dic['rates'][met][str(NI)][str(peak)]['Pval']
                     if Pval==False:
-                    # Get values for R1r
-                        datX_f_R1r = dc['R1r']['data'][:,0]
-                        datY_f_R1r = dc['R1r']['data'][:,1]
-                        datY_f_R1r_err = dc['R1r']['data'][:,2]
-                        calcR1r = dc['R1r']['data'][:,3]
+                        # Get values for R1r
+                        X_Y_Sigma_Fit = dc['R1r']['X_Y_Sigma_Fit']
+                        datX_f_R1r = X_Y_Sigma_Fit[:,0]
+                        datY_f_R1r = X_Y_Sigma_Fit[:,1]
+                        datY_f_R1r_err = X_Y_Sigma_Fit[:,2]
+                        calcR1r = X_Y_Sigma_Fit[:,3]
                         par_R1r = dc['R1r']['par']
                         datXs_f_R1r = sort(datX_f_R1r)
-                        datYs_f_R1r = f_R1r_lmfit(par_R1r,datXs_f_R1r)
-                        datXs_f_R1r_lin = linspace(datXs_f_R1r[0],datXs_f_R1r[-1],100)
-                        datYs_f_R1r_lin = f_R1r_lmfit(par_R1r,datXs_f_R1r_lin)
-                        #plot
-                        ax.errorbar(datX_f_R1r, datY_f_R1r,yerr=datY_f_R1r_err,fmt='.',label='%s %s %s. R1=%3.2f+-%3.2f '%(met, peakname, NI, par_R1r['R1'].value, par_R1r['R1'].stderr))
+                        datYs_f_R1r = f_R1r_calc(par_R1r,datXs_f_R1r)
+                        #datXs_f_R1r_lin = linspace(datXs_f_R1r[0],datXs_f_R1r[-1],100)
+                        #datYs_f_R1r_lin = f_R1r_calc(par_R1r,datXs_f_R1r_lin)
+
+                        ax.errorbar(datX_f_R1r, datY_f_R1r,yerr=datY_f_R1r_err,fmt='.',label='%s %s-%s %s. R1=%3.2f+-%3.2f '%(met, peak, peakname, NI, par_R1r['R1_v'], par_R1r['R1_e']))
                         ax.plot(datXs_f_R1r,datYs_f_R1r,"-",color=ax.lines[-1].get_color())
                         ax.plot(datX_f_R1r,calcR1r,"o",mfc='none',mec=ax.lines[-1].get_color())#
                         #ax.plot(datXs_f_R1r_lin,datYs_f_R1r_lin,"-",color=ax.lines[-1].get_color())
                     if Pval!=False:
                         figR1r_exch = figure('R1r_exch %s %s'%(NI,peak))
                         bx = figR1r_exch.add_subplot(111)
-                    # Get values for R1r_exch
-                        datX_f_R1r_exch = dc['R1r_exch']['data'][0]
-                        datY_f_R1r_exch = dc['R1r_exch']['data'][1]
-                        datY_f_R1r_exch_err = dc['R1r_exch']['data'][2]
-                        calcR1r_exch = dc['R1r_exch']['data'][3]
+                        # Get values for R1r_exch
+                        X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
+                        datX_f_R1r_exch = X_Y_Sigma_Fit_exch[0]
+                        datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
+                        datY_f_R1r_exch_err = X_Y_Sigma_Fit_exch[2]
+                        calcR1r_exch = X_Y_Sigma_Fit_exch[3]
                         par_R1r_exch = dc['R1r_exch']['par']
-                        #plot
                         tiltAngle_arr_s, omega1_arr_s = zip(*sorted(zip(datX_f_R1r_exch[0], datX_f_R1r_exch[1])))
                         datXs_f_R1r_exch = [array(tiltAngle_arr_s), array(omega1_arr_s)]
-                        datYs_f_R1r_exch = f_R1r_exch_lmfit(par_R1r_exch,datXs_f_R1r_exch)
+                        datYs_f_R1r_exch = f_R1r_exch_calc(par_R1r_exch,datXs_f_R1r_exch)
+
                         omega_plots = []
                         for om1 in unique_omega1:
                             tiltAngle_arr_s_lin = linspace(tiltAngle_arr_s[0],tiltAngle_arr_s[-1],100)
                             om1_arr = ones(len(tiltAngle_arr_s_lin))*om1
                             datXs_f_R1r_exch_lin = [array(tiltAngle_arr_s_lin), array(om1_arr)]
-                            datYs_f_R1r_exch_lin = f_R1r_exch_lmfit(par_R1r_exch,datXs_f_R1r_exch_lin)
+                            datYs_f_R1r_exch_lin = f_R1r_exch_calc(par_R1r_exch,datXs_f_R1r_exch_lin)
                             omega_plots.append([datXs_f_R1r_exch_lin,datYs_f_R1r_exch_lin])
                         bx.errorbar(datX_f_R1r_exch[0], datY_f_R1r_exch, yerr=datY_f_R1r_exch_err,fmt=".",label='%s %s %s'%(met, peakname, NI)) #  fit f_R1r_exch: %s, dc['R1r_exch']['p']
                         for omp in omega_plots:
                             colval = dic['omega1_col'][str(omp[0][1][0])]
-                            #print colval
                             bx.plot(omp[0][0],omp[1],"-", color=colval) # ,color=bx.lines[-1].get_color()
                         #bx.plot(datXs_f_R1r_exch[0],datYs_f_R1r_exch,"-",color=bx.lines[-1].get_color())
                         bx.plot(datX_f_R1r_exch[0],calcR1r_exch,"o",mfc='none',mec=bx.lines[-1].get_color())#,color=bx.lines[-1].get_color()
@@ -548,28 +667,34 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                 if Pval!=False:
                 # Get values for R1r_exch
                     dic['gfit'][met][str(NI)][str(peak)] = {}
-                    datX_f_R1r_exch = dc['R1r_exch']['data'][0]
-                    datY_f_R1r_exch = dc['R1r_exch']['data'][1]
-                    datY_f_R1r_exch_err = dc['R1r_exch']['data'][2]
-                    calcR1r_exch = dc['R1r_exch']['data'][3]
+                    X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
+                    datX_f_R1r_exch = X_Y_Sigma_Fit_exch[0]
+                    datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
+                    datY_f_R1r_exch_err = X_Y_Sigma_Fit_exch[2]
+                    calcR1r_exch = X_Y_Sigma_Fit_exch[3]
                     par_R1r_exch = dc['R1r_exch']['par']
-                    R1,R2,kEX,phi = par_R1r_exch['R1'].value,par_R1r_exch['R2'].value,par_R1r_exch['kEX'].value,par_R1r_exch['phi'].value
+
+                    R1,R2,kEX,phi = par_R1r_exch['R1_v'],par_R1r_exch['R2_v'],par_R1r_exch['kEX_v'],par_R1r_exch['phi_v']
                     #print "p: R1=%3.2f, R2=%3.2f, kEX=%3.2f, phi=%3.2f"%(R1,R2,kEX,phi)
                     tiltAngle_arr_s = datX_f_R1r_exch[0]; omega1_arr_s = datX_f_R1r_exch[1]
                     tilt.append(tiltAngle_arr_s); om1.append(omega1_arr_s)
                     R1rex.append(datY_f_R1r_exch)
                     R1rex_err.append(datY_f_R1r_exch_err)
-                    P_arr.add('R1%s'%peak, value=par_R1r_exch['R1'].value, vary=True, min=0.0)
-                    P_arr.add('R2%s'%peak, value=par_R1r_exch['R2'].value, vary=True, min=0.0)
-                    P_arr.add('phi%s'%peak, value=par_R1r_exch['phi'].value, vary=True, min=0.0)
+                    P_arr.add('R1%s'%peak, value=R1, vary=True, min=0.0)
+                    P_arr.add('R2%s'%peak, value=F2, vary=True, min=0.0)
+                    P_arr.add('phi%s'%peak, value=phi, vary=True, min=0.0)
                     sel_p.append(peak)
                     dic['gfit'][met][str(NI)][str(peak)]['resn'] = peakname
             dic['gfit'][met][str(NI)]['gfit_peaks'] = sel_p
             lmf = lmfit.minimize(f_R1r_exch_global, P_arr, args=(sel_p,tilt,om1,R1rex,R1rex_err),method='leastsq')
-            dic['gfit'][met][str(NI)]['par']= P_arr
-            dic['gfit'][met][str(NI)]['lmf']= lmf
-            unpack_global(dic, sel_p, met, NI) # Unpack the paramerts into the selected peaks
-            print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr=%4.4f"%(met,NI,P_arr['kEX'].value,lmf.chisqr)
+            dic_glob = unpack_global2(P_arr,datX_f_R1r,datY,f_sigma,lmf_R1r)
+            dic['gfit'][met][str(NI)]['R1r'].update(dic_glob)
+
+            #dic['gfit'][met][str(NI)]['par']= P_arr
+            #dic['gfit'][met][str(NI)]['lmf']= lmf
+            #unpack_global2(dic, sel_p, met, NI) # Unpack the paramerts into the selected peaks
+            #print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr=%4.4f"%(met,NI,P_arr['kEX'].value,lmf.chisqr)
+            #print "Medthod=%s, NI=%s, kEX=%4.4f, chisqr=%4.4f"%(met,NI,P_arr['kEX'].value,lmf.chisqr)
     return()
 
 def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
