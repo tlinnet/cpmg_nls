@@ -1,0 +1,5 @@
+NR= 2475 minx= -0.00154607 minxi= 96 maxx= 1 maxxi= 497 miny= -0.0363022 minyi= 1266 maxy= 0.420642 maxyi= 333 minres= -0.811097 minresi= 2 maxres= 0.232302 maxresi= 107
+xvar= 0.0379514 xstdev= 0.194811 yvar= 0.00523542 ystdev= 0.0723562 resvar= 0.0215887 resstdev= 0.146931 xycovar= 0.0107991
+r= 0.766119 r2= 0.586938 a= 0.284549 b= 0.0180342 alpha= 0.0180342 beta= 0.284549
+sx= 432.412 sy= 167.677 sxx= 169.477 sxy= 56.0228 syy= 24.3175
+se2= 0.0021643 sb2= 2.30417e-05 sa2= 1.5778e-06 sresNR= -0.106963

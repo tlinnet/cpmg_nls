@@ -34,3 +34,8 @@ ehthumbs.db
 Icon?
 Thumbs.db
 *~
+
+# Directory #
+#############
+pickle/
+awk_test/data/
