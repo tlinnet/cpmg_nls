@@ -20,6 +20,132 @@ figfont = 12
 #warnings.simplefilter('error')
 
 ####################################### Fit functions ##################################
+def f_R2s(pars,time,data=None):
+    R2 = pars['R2'].value
+    model = R2+zeros(len(time))
+    if data is None:
+        return model
+    return (model-data)
+
+def f_R2s_calc(par,time):
+    R2 = par['R2_v']
+    model = R2+zeros(len(time))
+    return model
+
+def unpack_f_R2s(par,X,Y,lmf=None):
+    dic2 = {}
+    Yfit = f_R2s(par,X)
+    dic2['Yfit']=Yfit
+    dic2['par']={}
+    dic2['par']['R2_v'] = par['R2'].value
+    dic2['par']['R2_e'] = par['R2'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    dic2['NDF'] = NDF
+    #print NDF, lmf.nfree
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_fit = array([X,Y,Yfit]).T
+    dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
+#################################################
+#Function R2cpmg(w,x) : FitFunc
+#    Wave w
+#    Variable x
+#
+#   //CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+#   //CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+#   //CurveFitDialog/ Equation:
+#   //CurveFitDialog/ Variable psi,z,Dm,Dp,nm,np
+#   //CurveFitDialog/
+#   //CurveFitDialog/ psi = kEX^2-w^2
+#   //CurveFitDialog/ z = -2*w*kEX*(2*pA-1)
+#   //CurveFitDialog/ Dp = 0.5*(1+(psi+2*w^2)/sqrt(psi^2+z^2))
+#   //CurveFitDialog/ Dm = 0.5*(-1+(psi+2*w^2)/sqrt(psi^2+z^2))
+#   //CurveFitDialog/ np = 1.0/2/sqrt(2)/x*sqrt(psi+sqrt(psi^2+z^2))
+#   //CurveFitDialog/ nm = 1.0/2/sqrt(2)/x*sqrt(-psi+sqrt(psi^2+z^2))
+#   //CurveFitDialog/
+#   //CurveFitDialog/ f(x) = R20+0.5*(kEX-2*x*acosh(Dp*cosh(np)-Dm*cos(nm)))
+#   //CurveFitDialog/ End of Equation
+#   //CurveFitDialog/ Independent Variables 1
+#   //CurveFitDialog/ x
+#   //CurveFitDialog/ Coefficients 4
+#   //CurveFitDialog/ w[0] = R20
+#   //CurveFitDialog/ w[1] = kEX
+#   //CurveFitDialog/ w[2] = w
+#   //CurveFitDialog/ w[3] = pA
+
+#    Variable psi,z,Dm,Dp,nm,np
+#    psi = w[1]^2-w[2]^2
+#    z = -2*w[2]*w[1]*(2*w[3]-1)
+#    Dp = 0.5*(1+(psi+2*w[2]^2)/sqrt(psi^2+z^2))
+#    Dm = 0.5*(-1+(psi+2*w[2]^2)/sqrt(psi^2+z^2))
+#    np = 1.0/2/sqrt(2)/x*sqrt(psi+sqrt(psi^2+z^2))
+#    nm = 1.0/2/sqrt(2)/x*sqrt(-psi+sqrt(psi^2+z^2))
+#    return w[0]+0.5*(w[1]-2*x*acosh(Dp*cosh(np)-Dm*cos(nm)))
+#End
+
+#Function R2cpmg_fast(w,x) : FitFunc
+#	Wave w
+#	Variable x
+#   //CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+#   //CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+#   //CurveFitDialog/ Equation:
+#   //CurveFitDialog/    f(x) = R20+(Psi/kEX)*(1-((4*x)/kEX)*tanh(kEX/(4*x)))
+#   //CurveFitDialog/   
+#   //CurveFitDialog/ End of Equation
+#   //CurveFitDialog/ Independent Variables 1
+#   //CurveFitDialog/ x
+#   //CurveFitDialog/ Coefficients 3
+#   //CurveFitDialog/ w[0] = R20
+#   //CurveFitDialog/ w[1] = kEX
+#   //CurveFitDialog/ w[2] = Psi
+#	   return w[0]+(w[2]/w[1])*(1-((4*x)/w[1])*tanh(w[1]/(4*x)))
+
+def f_R2cpmg_fast(pars,time,data=None):
+    R2 = pars['R2'].value
+    phi = pars['phi'].value
+    kEXb = pars['kEXb'].value
+    model = R2+(phi/kEXb)*(1-2*tanh(kEXb/4/time)/kEXb*time*2)
+    if data is None:
+        return model
+    return (model-data)
+
+def f_R2cpmg_fast_calc(par,time):
+    R2 = par['R2_v']
+    phi = par['phi_v']
+    kEXb = par['kEXb_v']
+    model = R2+(phi/kEXb)*(1-2*tanh(kEXb/4/time)/kEXb*time*2)
+    return model
+
+def unpack_f_R2cpmg_fast(par,X,Y,lmf=None):
+    dic2 = {}
+    Yfit = f_R2cpmg_fast(par,X)
+    dic2['Yfit']=Yfit
+    dic2['par']={}
+    dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
+    dic2['par']['phi_v'] = par['phi'].value; dic2['par']['phi_e'] = par['phi'].stderr
+    dic2['par']['kEXb_v'] = par['kEXb'].value; dic2['par']['kEXb_e'] = par['kEXb'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    dic2['NDF'] = NDF
+    #print NDF, lmf.nfree
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_fit = array([X,Y,Yfit]).T
+    dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
+
 #################################################
 def f_expdecay(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
     amp = pars['amp'].value
@@ -29,8 +155,7 @@ def f_expdecay(pars,time,data=None): #KTE: extract_sums_to_table.pl. Line 68.
         return model
     return (model-data)
 
-def f_expdecay_calc(inp):
-    par,time = inp
+def f_expdecay_calc(par,time):
     amp = par['amp_v']
     decay = par['decay_v']
     model = amp*exp(-decay*time)
@@ -267,6 +392,7 @@ def peakname(dic,peaks=False,mets=False):
             print peak, resn
 ################### Data loading
 def getstat(dic,dt):
+    logger = logging.getLogger("TB.TB.getstat")
     startTime = datetime.now()
     fpath = dic['path']
     dic['stats']['data'] = {}
@@ -282,9 +408,11 @@ def getstat(dic,dt):
         dic['NIarr'][met] = NIarr
         dic['NImax'][met] = max(NIarr)
     print "Done getting stat file. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done getting stat file. It took: %s"%(datetime.now()-startTime))
     return()
 
 def getser(dic,dt):
+    logger = logging.getLogger("TB.TB.getser")
     startTime = datetime.now()
     fpath = dic['path']
     dic['ser']['data'] = {}
@@ -302,6 +430,7 @@ def getser(dic,dt):
         dic['peakrange'][met] = range(int(data[:,0][0]),int(data[:,0][-1]+1))
         dic['filenr'][met] = int(data[:,0].size/len(dic['peakrange'][met]))
     print "Done getting ser file. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done getting ser file. It took: %s"%(datetime.now()-startTime))
     return()
 ##################### Sort data into peaks
 def sortInt(dic,dt):
@@ -337,6 +466,7 @@ def sortInt(dic,dt):
     return()
 ##################### Calculate rates
 def getdecay(dic,mets=False,NIstop=False):
+    logger = logging.getLogger("TB.TB.getdecay")
     startTime = datetime.now()
     multiprocess = dic['Flags']['multiprocess']
     multi_inp_arr = []
@@ -416,6 +546,7 @@ def getdecay(dic,mets=False,NIstop=False):
                     i+=1
     if multiprocess:
         print "Doing multiprocess fitting for decay rates"
+        logger.info("Doing multiprocess fitting for decay rates")
         pool = Pool(processes=dic['Flags']['multiprocess'])
         multi_res = pool.map(multi_f_expdecay, multi_inp_arr) 
         #from handythread import foreach
@@ -428,11 +559,140 @@ def getdecay(dic,mets=False,NIstop=False):
             dic2 = multi_res[i]
             dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dic2)
     print "Done with Getting decay rates. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done with Getting decay rates. It took: %s"%(datetime.now()-startTime))
+    return()
+
+def getrelax(dic,mets=False,NIstop=False):
+    startTime = datetime.now()
+    logger = logging.getLogger("TB.TB.getrelax")
+#    multiprocess = dic['Flags']['multiprocess']
+#    multi_inp_arr = []
+#    multi_sort_arr = []
+    ncyc_arr = dic['ncyc']
+    time_T2 = dic['time_T2']
+#    centerPPM = dic['NMRpar']['centerPPM']
+#    frq = dic['NMRpar']['frq']
+    slicet = len(ncyc_arr)
+    dic['relax'] = {}
+    if not mets: mets = dic['qMDDmet'][0]
+    for met in mets:        Int = dic['Int'][met]
+        filenr = dic['filenr'][met]
+        dic['relax'][met] = {}
+        NIarr = dic['NIarr'][met]
+        for NI in NIarr:
+            if NIstop:
+                if NI <= NIstop: break
+                else: pass
+            else:
+                if NI <= dic['NIstop']: break
+                else: pass
+            print "%s - Getting relaxation rates for NI=%s"%(met,NI)
+            dic['relax'][met][str(NI)] = {}
+            Pval_peaks = []
+            peaks = dic['peakrange'][met]
+            for peak in peaks:
+            #for peak in ['1','2']:                dic['relax'][met][str(NI)][str(peak)] = {}
+                peakname = Int[str(peak)]['resn']
+                dic['relax'][met][str(NI)][str(peak)]['resn'] = peakname
+                #print peakname
+                CS_N = Int[str(peak)]['CS_N']
+                CS_H = Int[str(peak)]['CS_H']
+                zeroSum = []
+                for fs in range(filenr):
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)] = {}
+                    FTInt = Int[str(peak)]['FTInt'][fs]
+                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                    MetInt = FTInt*NIInt
+                    zeroSum.append(MetInt)
+                averageZero = average(zeroSum)
+                dic['relax'][met][str(NI)][str(peak)]['averageZero'] = averageZero
+                CS_H_arr = []
+                CS_N_arr = []
+                R2eff_arr = []
+                time_arr = []
+                i = 0
+                for fs in range(filenr):
+                    FTInt = Int[str(peak)]['FTInt'][fs]
+                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                    MetInt = FTInt*NIInt
+                    CS_H_arr.append(CS_H[fs])
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
+                    CS_N_arr.append(CS_N[fs])
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
+                    time = ncyc_arr[i]/time_T2
+                    time_arr.append(time)
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['time'] = time
+                    R2eff = -1.0/time_T2*log(MetInt/averageZero)
+                    R2eff_arr.append(R2eff)
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
+                    i+=1
+                dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
+                dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
+                time_arr,R2eff_arr = zip(*sorted(zip(time_arr, R2eff_arr)))
+                time_slice = next(x[0] for x in enumerate(time_arr) if x[1] > 0.001)
+                time_arr_s = array(time_arr[time_slice:])
+                R2eff_arr_s = array(R2eff_arr[time_slice:])
+                dic['relax'][met][str(NI)][str(peak)]['time_arr'] = time_arr
+                dic['relax'][met][str(NI)][str(peak)]['time_arr_s'] = time_arr_s
+                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
+                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
+                dic['relax'][met][str(NI)][str(peak)]['time_slice'] = time_slice
+                Fval, Fdist, Pval = False, False, False
+                # Calculate for R2 simple
+                try:
+                    par_R2s = lmfit.Parameters()
+                    par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(time_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2s = unpack_f_R2s(par_R2s,time_arr_s,R2eff_arr_s,lmf_R2s)
+                    dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
+                    dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
+                    OK_R2s = True
+                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+                except (Exception) as e:
+                    print "Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                    OK_R2s = False
+                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+                # Calculate for R2 fast
+                try:
+                    par_R2cpmg_fast = lmfit.Parameters()
+                    par_R2cpmg_fast.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    par_R2cpmg_fast.add('phi', value=dic['guess']['s_phi'], vary=True, min=0.0)
+                    par_R2cpmg_fast.add('kEXb', value=dic['guess']['s_kEXb'], vary=True, min=0.0)
+                    lmf_R2cpmg_fast = lmfit.minimize(f_R2cpmg_fast, par_R2cpmg_fast, args=(time_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2cpmg_fast = unpack_f_R2cpmg_fast(par_R2cpmg_fast,time_arr_s,R2eff_arr_s,lmf_R2cpmg_fast)
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast'] = {}
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast'].update(dic_R2cpmg_fast)
+                    OK_R2cpmg_fast = True
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast']['OK_fit'] = OK_R2cpmg_fast
+                except (Exception) as e:
+                    print "Cannot fit R2cpmg_fast for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R2cpmg_fast for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                    OK_R2cpmg_fast = False
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast']['OK_fit'] = OK_R2cpmg_fast
+                if OK_R2s and OK_R2cpmg_fast:
+                    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_fast['chisqr'],dic_R2cpmg_fast['NDF'])
+                dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
+                dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
+                dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
+                if Pval==False:
+                    pass
+                elif Pval!=False:
+                    Pval_peaks.append(peak)
+            dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
+            print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
+            logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
+            print "Peaks:%s"%(Pval_peaks)
+            logger.info("Peaks:%s"%(Pval_peaks))
+    print "Done relaxation rates. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
     return()
 
 def getrates(dic,mets=False,NIstop=False):
+    logger = logging.getLogger("TB.TB.getrates")
     startTime = datetime.now()
     print "Getting exchange rates"
+    logger.info("Getting exchange rates")
     dic['rates'] = {}
     slicet = len(dic['time'])
     if not mets: mets = dic['qMDDmet'][0]
@@ -489,6 +749,7 @@ def getrates(dic,mets=False,NIstop=False):
                     dic['rates'][met][str(NI)][str(peak)]['R1r']['OK_fit'] = OK_R1r
                 except (Exception) as e:
                     print "Cannot fit R1r for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R1r for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
                     OK_R1r = False
                     dic['rates'][met][str(NI)][str(peak)]['R1r']['OK_fit'] = OK_R1r
                 # Calculate for R1r_exch
@@ -505,6 +766,7 @@ def getrates(dic,mets=False,NIstop=False):
                     dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['OK_fit'] = OK_R1r_exch
                 except (Exception) as e:
                     print "Cannot fit R1r_exch NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R1r_exch NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
                     OK_R1r_exch = False
                     dic['rates'][met][str(NI)][str(peak)]['R1r_exch']['OK_fit'] = OK_R1r_exch
                 if OK_R1r and OK_R1r_exch:
@@ -518,8 +780,11 @@ def getrates(dic,mets=False,NIstop=False):
                     Pval_peaks.append(peak)
             dic['rates'][met][str(NI)]['Pval_peaks'] = Pval_peaks
             print "Following peak numbers passed the Ftest. Met:%s NI=%s."%(met, NI)
+            logger.info("Following peak numbers passed the Ftest. Met:%s NI=%s."%(met, NI))
             print "Peaks:%s"%(Pval_peaks)
+            logger.info("Peaks:%s"%(Pval_peaks))
     print "Done exchange rates. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done exchange rates. It took: %s"%(datetime.now()-startTime))
     return()
 
 def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
@@ -775,7 +1040,7 @@ def plotstats(dics,mets):
         #show()
     return()
 
-def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
+def plotdecays(dics,mets=False,peaks=False,NIa=False,fss=[0]):
     #TB.plotdecays([BBL],['coMDD'])
     #TB.plotdecays([BBL],['coMDD','CS'],fss=range(0,35,5))
     for dic in dics:
@@ -784,7 +1049,8 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
         ax = fig.add_subplot(111)
         if not mets: mets = dic['qMDDmet'][0]
         for met in mets:
-            if not NIarr: NIarr = list(dic['NIarr'][met][:2]) # [dic['NImax'][met]] #
+            if not NIa: NIarr = list(dic['NIarr'][met][:2]) # [dic['NImax'][met]] #
+            else: NIarr = NIa
             for NI in NIarr:
                 if not peaks: peaks = ['1']
                 #print peaks, type(peaks)
@@ -802,7 +1068,7 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
                         b_e = par['decay_e']
                         datXs = sort(datX)
                         fitXlin = linspace(datXs[0],datXs[-1],100)
-                        fitYlin = f_expdecay_calc([par,fitXlin])
+                        fitYlin = f_expdecay_calc(par,fitXlin)
                         ax.plot(datX,datY,".",label='%s %s %s %s. fit [a*exp(-b*x]: a=%3.2f +-%3.2f, a=%3.2f +-%3.2f '%(met, peakname, NI, fs, a,a_e,b,b_e))
                         ax.plot(fitXlin,fitYlin,"-",color=ax.lines[-1].get_color())
                         ax.plot(datX,fitY,"o",mfc='none',mec=ax.lines[-1].get_color())
@@ -817,14 +1083,86 @@ def plotdecays(dics,mets=False,peaks=False,NIarr=False,fss=[0]):
         #show()
     return()
 
-def plotrates(dics,mets=False,peaks=False,NIarr=False):
+def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
+#    fig = figure(figsize=(figsize, figsize/1.618))
+#    ax = fig.add_subplot(111)
+#    ax.plot(time_arr_s,R2eff_arr_s,"o")
+#    ax.plot(time_arr_s,dic_R2s['Yfit'],"-")
+#    ax.plot(time_arr_s,dic_R2cpmg_fast['Yfit'],"-")
+#    show()             
+    for dic in dics:
+        desc_name = dic['desc']['name']
+        if not mets: mets = dic['qMDDmet'][0]
+        for met in mets:
+            if not peaks: peaks = dic['peakrange'][met]
+            if not NIa: NIarr = list(dic['NIarr'][met][:1]) #
+            else: NIarr = NIa
+            for NI in NIarr:
+                figR2s = figure('R2_%s_%s'%(NI,desc_name),figsize=(figsize, figsize/1.618))
+                ax = figR2s.add_subplot(111)
+                for peak in peaks:
+                    dc = dic['relax'][met][str(NI)][str(peak)]
+                    peakname = dc['resn']
+                    Pval = dic['relax'][met][str(NI)][str(peak)]['Pval']
+                    if Pval==False:
+                        # Get values for R2
+                        X_Y_Fit = dc['R2s']['X_Y_Fit']
+                        #print peakname
+                        datX_f_R2s = X_Y_Fit[:,0]
+                        datY_f_R2s = X_Y_Fit[:,1]
+                        calcR2s = X_Y_Fit[:,2]
+                        par_R2s = dc['R2s']['par']
+                        datXs_f_R2s_lin = linspace(datX_f_R2s[0],datX_f_R2s[-1],100)
+                        datYs_f_R2s_lin = f_R2s_calc(par_R2s,datXs_f_R2s_lin)
+                        ax.errorbar(datX_f_R2s, datY_f_R2s,fmt='.',label='%s %s-%s %s. R1=%3.2f+-%3.2f '%(met, peak, peakname, NI, par_R2s['R2_v'], par_R2s['R2_e']))
+                        ax.plot(datX_f_R2s,datY_f_R2s,"-")
+                        ax.plot(datXs_f_R2s_lin,datYs_f_R2s_lin,"-",color=ax.lines[-1].get_color())
+                        ax.plot(datX_f_R2s,calcR2s,"o",mfc='none',mec=ax.lines[-1].get_color())#
+                    if Pval!=False:
+                        figR2cpmg_fast = figure('R2cpmg_fast_%s_%s_%s'%(NI,peak,desc_name),figsize=(figsize, figsize/1.618))
+                        bx = figR2cpmg_fast.add_subplot(111)
+                        # Get values for R2cpmg_fast
+                        X_Y_Fit_exch = dc['R2cpmg_fast']['X_Y_Fit']
+                        datX_f_R2cpmg_fast = X_Y_Fit_exch[:,0]
+                        datY_f_R2cpmg_fast = X_Y_Fit_exch[:,1]
+                        calcR2cpmg_fast = X_Y_Fit_exch[:,2]
+                        par_R2cpmg_fast = dc['R2cpmg_fast']['par']
+                        datXs_f_R2cpmg_fast_lin = linspace(datX_f_R2cpmg_fast[0],datX_f_R2cpmg_fast[-1],100)
+                        datYs_f_R2cpmg_fast_lin = f_R2cpmg_fast_calc(par_R2cpmg_fast,datXs_f_R2cpmg_fast_lin )
+                        bx.errorbar(datX_f_R2cpmg_fast, datY_f_R2cpmg_fast,fmt='.',label='%s %s-%s %s.'%(met, peak, peakname, NI))
+                        bx.plot(datX_f_R2cpmg_fast,datY_f_R2cpmg_fast,"-")
+                        bx.plot(datXs_f_R2cpmg_fast_lin,datYs_f_R2cpmg_fast_lin,"-",color=bx.lines[-1].get_color())
+                        bx.plot(datX_f_R2cpmg_fast,calcR2cpmg_fast,"o",mfc='none',mec=bx.lines[-1].get_color())#
+                        #R2cpmg_fast graph
+                        bx.set_title('R2cpmg fast fitting')
+                        bx.set_xlabel('Time')
+                        bx.set_ylabel('R2cpmg fast coef')
+                        box = bx.get_position()
+                        bx.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+                        bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+                        bx.grid('on')
+                #R1r graph
+                ax.set_title('R2 fitting')
+                ax.set_xlabel('Time')
+                ax.set_ylabel('R2 coef')
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
+                ax.grid('on')
+    print "Write: show() , to see graphs"
+#    #show()
+    return()
+
+def plotrates(dics,mets=False,peaks=False,NIa=False):
     for dic in dics:
         desc_name = dic['desc']['name']
         unique_omega1 = sort(f5(dic['omega1']))
         if not mets: mets = dic['qMDDmet'][0]
         for met in mets:
             if not peaks: peaks = dic['peakrange'][met]
-            if not NIarr: NIarr = list(dic['NIarr'][met][:2]) #
+            if not NIa: NIarr = list(dic['NIarr'][met][:2]) #
+            else: NIarr = NIa
+            print NIarr
             for NI in NIarr:
                 figR1r = figure('R1r_%s_%s'%(NI,desc_name),figsize=(figsize, figsize/1.618))
                 ax = figR1r.add_subplot(111)

@@ -61,16 +61,24 @@ endif
 
 echo HD data disassembling
 set i=0
+set cowait=`seq 0 10`
 foreach dir ( $procDirs )
     #echo "Killing all csh"
     #killall csh
-    sleep 10
-    echo "   "$dir
-    echo "In directory: $PWD"
-    echo "setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log"
-    setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log
-    set ecode=$?
-    echo "setHD succesfull? 0=yes, 1=no. Result= $ecode"
+    foreach cw ( $cowait )
+        echo "   "$dir
+        echo "In directory: $PWD"
+        echo "setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log"
+        setHD coMDD.hd res $nreg ../$dir/MDD/region%02d.res hd%02d.res $i >>&log
+        set ecode=$?
+        echo "setHD succesfull? 0=yes, 1=no. Result= $ecode"
+        if ( $ecode ) then
+            echo "ecode is $ecode. Sleeping $cw"
+            sleep $cw
+        else
+            break            
+        endif
+    end
     echo "In dir: $dir"
     if ( $ecode ) then
         echo Error while data disassembling
