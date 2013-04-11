@@ -16,8 +16,8 @@ labfont = 12
 figfont = 12
 
 ##### To handle "RuntimeWarning" from fitting functions to be handled as errors
-#import warnings
-#warnings.simplefilter('error')
+import warnings
+warnings.simplefilter('error')
 
 ####################################### Fit functions ##################################
 def f_R2s(pars,time,data=None):
@@ -106,6 +106,51 @@ def unpack_f_R2s(par,X,Y,lmf=None):
 #   //CurveFitDialog/ w[1] = kEX
 #   //CurveFitDialog/ w[2] = Psi
 #	   return w[0]+(w[2]/w[1])*(1-((4*x)/w[1])*tanh(w[1]/(4*x)))
+
+def f_R2cpmg_slow(pars,nu,data=None):
+    #The inverted chevron plot measured by NMR relaxation reveals a native-like unfolding intermediate in acyl-CoA binding protein.
+    #Kaare Teilum, Flemming M Poulsen, Mikael Akke in Proceedings of the National Academy of Sciences of the United States of America (2006)
+    R2 = pars['R2'].value
+    Domega = pars['Domega'].value
+    ka = pars['ka'].value
+    tau_cpmg = 1.0/(4*nu) #Page 6881
+    model = R2+ka*(1.0-sin(Domega*tau_cpmg)/(Domega*tau_cpmg))
+    if data is None:
+        return model
+    return (model-data)
+
+def f_R2cpmg_slow_calc(par,nu):
+    R2 = par['R2_v']
+    Domega = par['Domega_v']
+    ka = par['ka_v']
+    tau_cpmg = 1.0/(4*nu) #Page 6881
+    model = R2+ka*(1.0-sin(Domega*tau_cpmg)/(Domega*tau_cpmg))
+    return model
+
+def unpack_f_R2cpmg_slow(par,nu,Y,lmf=None):
+    dic2 = {}
+    Yfit = f_R2cpmg_slow(par,nu)
+    dic2['Yfit']=Yfit
+    dic2['par']={}
+    dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
+    dic2['par']['Domega_v'] = par['Domega'].value; dic2['par']['Domega_e'] = par['Domega'].stderr
+    dic2['par']['ka_v'] = par['ka'].value; dic2['par']['ka_e'] = par['ka'].stderr
+    residual = Yfit - Y
+    #print sum(residual - lmf.residual)
+    dic2['residual'] = residual
+    chisqr = sum(residual**2)
+    #print chisqr - lmf.chisqr
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    dic2['NDF'] = NDF
+    #print NDF, lmf.nfree
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_fit = array([nu,Y,Yfit]).T
+    dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
+
+######################################
 
 def f_R2cpmg_fast(pars,time,data=None):
     R2 = pars['R2'].value
@@ -502,7 +547,6 @@ def getdecay(dic,mets=False,NIstop=False):
                 i = 0
                 for fs in range(0,filenr,slicet):
                 ##for fs in range(0,5,slicet):
-                    dic['decay'][met][str(NI)][str(peak)][str(fs)] = {}
                     fe = fs+slicet
                     FTInt = Int[str(peak)]['FTInt'][fs:fe]
                     NIInt = Int[str(peak)]['NIInt'][str(NI)][fs:fe]
@@ -514,13 +558,19 @@ def getdecay(dic,mets=False,NIstop=False):
                     parmulti = {'amp_v':1.0,'decay_v':10.0,'decay_min':0.0}
                     multi_inp_arr.append([parmulti,datX,datY])
                     multi_sort_arr.append([met,NI,peak,fs])
+                    dic['decay'][met][str(NI)][str(peak)][str(fs)] = {}
                     if not multiprocess:
                         try:
                             lmf = lmfit.minimize(f_expdecay, par, args=(datX, datY),method='leastsq')
                             dic2 = unpack_f_expdecay(par,datX,datY,lmf)
                             dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dic2)
+                            OK_decay = True
+                            dic['rates'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
                         except (Exception) as e:
                             print "Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e)
+                            logger.info("Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e))
+                            OK_decay = False
+                            dic['rates'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
                     # Setting keys
                     offset = dic['offset'][i]
                     omega1 = dic['omega1'][i]
@@ -590,26 +640,35 @@ def getrelax(dic,mets=False,NIstop=False):
             dic['relax'][met][str(NI)] = {}
             Pval_peaks = []
             peaks = dic['peakrange'][met]
+            #peaks = ['57']
             for peak in peaks:
-            #for peak in ['1','2']:                dic['relax'][met][str(NI)][str(peak)] = {}
+                dic['relax'][met][str(NI)][str(peak)] = {}
                 peakname = Int[str(peak)]['resn']
                 dic['relax'][met][str(NI)][str(peak)]['resn'] = peakname
                 #print peakname
-                CS_N = Int[str(peak)]['CS_N']
-                CS_H = Int[str(peak)]['CS_H']
-                zeroSum = []
+                MetInt_arr = []
+                nu_arr = []
+                i = 0
                 for fs in range(filenr):
                     dic['relax'][met][str(NI)][str(peak)][str(fs)] = {}
                     FTInt = Int[str(peak)]['FTInt'][fs]
                     NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
                     MetInt = FTInt*NIInt
-                    zeroSum.append(MetInt)
-                averageZero = average(zeroSum)
+                    MetInt_arr.append(MetInt)
+                    nu = ncyc_arr[i]/time_T2
+                    nu_arr.append(nu)
+                    i+=1
+                nu_arr,MetInt_arr = zip(*sorted(zip(nu_arr, MetInt_arr)))
+                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                averageZero = average(MetInt_arr[:nu_slice])
                 dic['relax'][met][str(NI)][str(peak)]['averageZero'] = averageZero
+                #
+                CS_N = Int[str(peak)]['CS_N']
+                CS_H = Int[str(peak)]['CS_H']
                 CS_H_arr = []
                 CS_N_arr = []
                 R2eff_arr = []
-                time_arr = []
+                nu_arr = []
                 i = 0
                 for fs in range(filenr):
                     FTInt = Int[str(peak)]['FTInt'][fs]
@@ -619,32 +678,33 @@ def getrelax(dic,mets=False,NIstop=False):
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
                     CS_N_arr.append(CS_N[fs])
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
-                    time = ncyc_arr[i]/time_T2
-                    time_arr.append(time)
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['time'] = time
+                    nu = ncyc_arr[i]/time_T2
+                    nu_arr.append(nu)
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
                     R2eff = -1.0/time_T2*log(MetInt/averageZero)
                     R2eff_arr.append(R2eff)
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
                     i+=1
                 dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
                 dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
-                time_arr,R2eff_arr = zip(*sorted(zip(time_arr, R2eff_arr)))
-                time_slice = next(x[0] for x in enumerate(time_arr) if x[1] > 0.001)
-                time_arr_s = array(time_arr[time_slice:])
-                R2eff_arr_s = array(R2eff_arr[time_slice:])
-                dic['relax'][met][str(NI)][str(peak)]['time_arr'] = time_arr
-                dic['relax'][met][str(NI)][str(peak)]['time_arr_s'] = time_arr_s
+                nu_arr,R2eff_arr = zip(*sorted(zip(nu_arr, R2eff_arr)))
+                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                nu_arr_s = array(nu_arr[nu_slice:])
+                R2eff_arr_s = array(R2eff_arr[nu_slice:])
+                dic['relax'][met][str(NI)][str(peak)]['nu_arr'] = nu_arr
+                dic['relax'][met][str(NI)][str(peak)]['nu_arr_s'] = nu_arr_s
                 dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
                 dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
-                dic['relax'][met][str(NI)][str(peak)]['time_slice'] = time_slice
+                dic['relax'][met][str(NI)][str(peak)]['nu_slice'] = nu_slice
                 Fval, Fdist, Pval = False, False, False
                 # Calculate for R2 simple
+                dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
+                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'] = {}
                 try:
                     par_R2s = lmfit.Parameters()
                     par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
-                    lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(time_arr_s, R2eff_arr_s),method='leastsq')
-                    dic_R2s = unpack_f_R2s(par_R2s,time_arr_s,R2eff_arr_s,lmf_R2s)
-                    dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
+                    lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2s = unpack_f_R2s(par_R2s,nu_arr_s,R2eff_arr_s,lmf_R2s)
                     dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
                     OK_R2s = True
                     dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
@@ -653,25 +713,25 @@ def getrelax(dic,mets=False,NIstop=False):
                     logger.info("Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
                     OK_R2s = False
                     dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
-                # Calculate for R2 fast
+                # Calculate for R2 slow
                 try:
-                    par_R2cpmg_fast = lmfit.Parameters()
-                    par_R2cpmg_fast.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
-                    par_R2cpmg_fast.add('phi', value=dic['guess']['s_phi'], vary=True, min=0.0)
-                    par_R2cpmg_fast.add('kEXb', value=dic['guess']['s_kEXb'], vary=True, min=0.0)
-                    lmf_R2cpmg_fast = lmfit.minimize(f_R2cpmg_fast, par_R2cpmg_fast, args=(time_arr_s, R2eff_arr_s),method='leastsq')
-                    dic_R2cpmg_fast = unpack_f_R2cpmg_fast(par_R2cpmg_fast,time_arr_s,R2eff_arr_s,lmf_R2cpmg_fast)
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast'] = {}
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast'].update(dic_R2cpmg_fast)
-                    OK_R2cpmg_fast = True
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast']['OK_fit'] = OK_R2cpmg_fast
+                    par_R2cpmg_slow = lmfit.Parameters()
+                    par_R2cpmg_slow.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    par_R2cpmg_slow.add('Domega', value=dic['guess']['s_Domega'], vary=True, min=0.0)
+                    par_R2cpmg_slow.add('ka', value=dic['guess']['s_ka'], vary=True, min=0.0)
+                    lmf_R2cpmg_slow = lmfit.minimize(f_R2cpmg_slow, par_R2cpmg_slow, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2cpmg_slow = unpack_f_R2cpmg_slow(par_R2cpmg_slow,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_slow)
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'].update(dic_R2cpmg_slow)
+                    OK_R2cpmg_slow = True
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
+                    #print lmf_R2cpmg_slow.success
                 except (Exception) as e:
-                    print "Cannot fit R2cpmg_fast for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
-                    logger.info("Cannot fit R2cpmg_fast for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
-                    OK_R2cpmg_fast = False
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_fast']['OK_fit'] = OK_R2cpmg_fast
-                if OK_R2s and OK_R2cpmg_fast:
-                    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_fast['chisqr'],dic_R2cpmg_fast['NDF'])
+                    print "Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                    OK_R2cpmg_slow = False
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
+                if OK_R2s and OK_R2cpmg_slow:
+                    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_slow['chisqr'],dic_R2cpmg_slow['NDF'])
                 dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
                 dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
                 dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
@@ -679,6 +739,7 @@ def getrelax(dic,mets=False,NIstop=False):
                     pass
                 elif Pval!=False:
                     Pval_peaks.append(peak)
+
             dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
             print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
             logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
@@ -686,7 +747,7 @@ def getrelax(dic,mets=False,NIstop=False):
             logger.info("Peaks:%s"%(Pval_peaks))
     print "Done relaxation rates. It took: %s"%(datetime.now()-startTime)
     logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
-    return()
+    return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
 
 def getrates(dic,mets=False,NIstop=False):
     logger = logging.getLogger("TB.TB.getrates")
@@ -713,8 +774,6 @@ def getrates(dic,mets=False,NIstop=False):
             Pval_peaks = []
             for peak in dic['peakrange'][met]:
                 dic['rates'][met][str(NI)][str(peak)] = {}
-                dic['rates'][met][str(NI)][str(peak)]['R1r'] = {}
-                dic['rates'][met][str(NI)][str(peak)]['R1r_exch'] = {}
                 tiltAngle_arr = []
                 R1r_rates_arr = []
                 R1r_err_arr = []
@@ -737,6 +796,8 @@ def getrates(dic,mets=False,NIstop=False):
                 datY = array(R1r_rates_arr)
                 f_sigma = array(R1r_err_arr) # The std. error on Y
                 Fval, Fdist, Pval = False, False, False
+                dic['rates'][met][str(NI)][str(peak)]['R1r'] = {}
+                dic['rates'][met][str(NI)][str(peak)]['R1r_exch'] = {}
                 # Calculate for R1r
                 try:
                     par_R1r = lmfit.Parameters()
@@ -883,15 +944,10 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                 print "%s No Global fit for NI=%s, since len(peaks):%s"%(met,NI,len(peaks))
     return()
 
-def get_glob_props(dic,mets=False,NIstop=False):
-    if not mets: mets = dic['qMDDmet'][0]
-    getglob_chisqr_prop(dic,mets,NIstop)
-    getglob_phi_prop(dic,mets,NIstop)
-    getglob_R1_prop(dic,mets,NIstop)
-    getglob_R2_prop(dic,mets,NIstop)
-    return()
+##################################
 
-def del_chisq_prop(dic,mets=False,NIstop=False): #TB.del_chisq_prop(BBL,BBL['qMDDmet'])
+def del_par_props(dic,pars,mets=False,NIstop=False): #TB.del_chisq_prop(BBL,BBL['qMDDmet'])
+    #TB.del_par_props(BBL,['phi','R1','R2','phi_v','R1_v','R2_v'],BBL['qMDDmet'])
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -904,7 +960,26 @@ def del_chisq_prop(dic,mets=False,NIstop=False): #TB.del_chisq_prop(BBL,BBL['qMD
                 else: pass
             peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
             if len(peaks) > 0 :
-                del(dic['gfit'][met][str(NI)]['chisq_prop'])
+                try:
+                    del(dic['gfit'][met][str(NI)]['chisqr_prop'])
+                except (KeyError) as e:
+                    print "Could not delete key:%s"%e
+                for par in pars:
+                    try:
+                        del(dic['gfit'][met][str(NI)]['%s_prop'%par])
+                    except (KeyError) as e:
+                        print "Could not delete key:%s"%e
+                    try:
+                        del(dic['gfit'][met][str(NI)]['par']['%s_prop'%par])
+                    except (KeyError) as e:
+                        print "Could not delete key:%s"%e
+    return()
+
+def get_glob_props(dic,pars,mets=False,NIstop=False):
+    if not mets: mets = dic['qMDDmet'][0]
+    getglob_chisqr_prop(dic,mets,NIstop)
+    for par in pars:
+        getglob_par_prop(dic,par,mets,NIstop)
     return()
 
 def getglob_chisqr_prop(dic,mets=False,NIstop=False):
@@ -934,7 +1009,7 @@ def getglob_chisqr_prop(dic,mets=False,NIstop=False):
                 dic['gfit'][met][str(NI)]['chisqr_prop'] = NI_prop
     return()
 
-def getglob_phi_prop(dic,mets=False,NIstop=False):
+def getglob_par_prop(dic,par,mets=False,NIstop=False):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -952,43 +1027,23 @@ def getglob_phi_prop(dic,mets=False,NIstop=False):
                 for peak in peaks:
                     gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
                     sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
-                    phi_glob = gf['par']['phi_v']
-                    phi_sing = sf['par']['phi_v']
-                    prop = phi_glob/phi_sing
+                    par_glob = gf['par']['%s_v'%par]
+                    par_sing = sf['par']['%s_v'%par]
+                    prop = par_glob/par_sing
                     NIlist.append(float(NI))
                     proplist.append(prop)
                 NI_prop = array([NIlist,proplist]).T
-                dic['gfit'][met][str(NI)]['phi_prop'] = NI_prop
+                dic['gfit'][met][str(NI)]['par']['%s_prop'%par] = NI_prop
     return()
 
-def getglob_R1_prop(dic,mets=False,NIstop=False):
+def get_glob_pearsons(dic,pars,mets=False,NIstop=False):
     if not mets: mets = dic['qMDDmet'][0]
-    for met in mets:
-        NIarr = dic['NIarr'][met]
-        for NI in NIarr:
-            if NIstop:
-                if NI <= NIstop: break
-                else: pass
-            else:
-                if NI <= dic['NIstop']: break
-                else: pass
-            peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-            if len(peaks) > 0 :
-                NIlist = []
-                proplist = []
-                for peak in peaks:
-                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
-                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
-                    R1_glob = gf['par']['R1_v']
-                    R1_sing = sf['par']['R1_v']
-                    prop = R1_glob/R1_sing
-                    NIlist.append(float(NI))
-                    proplist.append(prop)
-                NI_prop = array([NIlist,proplist]).T
-                dic['gfit'][met][str(NI)]['R1_prop'] = NI_prop
+    getglob_chisqr_pearson(dic,mets,NIstop)
+    for par in pars:
+        getglob_par_pearson(dic,par,mets,NIstop)
     return()
 
-def getglob_R2_prop(dic,mets=False,NIstop=False):
+def getglob_chisqr_pearson(dic,mets=False,NIstop=False):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -1002,17 +1057,79 @@ def getglob_R2_prop(dic,mets=False,NIstop=False):
             peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
             if len(peaks) > 0 :
                 NIlist = []
-                proplist = []
+                chisqr_sing_list = []
+                chisqr_glob_list = []
                 for peak in peaks:
                     gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
                     sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
-                    R2_glob = gf['par']['R2_v']
-                    R2_sing = sf['par']['R2_v']
-                    prop = R2_glob/R2_sing
+                    chisqr_sing = sf['chisqr'] 
+                    chisqr_glob = gf['chisqr']
                     NIlist.append(float(NI))
-                    proplist.append(prop)
-                NI_prop = array([NIlist,proplist]).T
-                dic['gfit'][met][str(NI)]['R2_prop'] = NI_prop
+                    chisqr_sing_list.append(chisqr_sing)
+                    chisqr_glob_list.append(chisqr_glob)
+            NI_pear = array([NIlist,chisqr_sing_list,chisqr_glob_list]).T
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_data'] = NI_pear
+            Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,2])
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff'] = Pearson_Corr_Coeff
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff_tailed_p_value'] = Pearson_Corr_Coeff_tailed_p_value
+            lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,2])
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_slope'] = lin_slope
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_inter'] = lin_inter
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_r_value'] = lin_r_value
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_p_value'] = lin_p_value
+            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_std_err'] = lin_std_err
+    return()
+
+def getglob_par_pearson(dic,par,mets=False,NIstop=False):
+    if not mets: mets = dic['qMDDmet'][0]
+    for met in mets:
+        NIarr = dic['NIarr'][met]
+        for NI in NIarr:
+            if NIstop:
+                if NI <= NIstop: break
+                else: pass
+            else:
+                if NI <= dic['NIstop']: break
+                else: pass
+            peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
+            try:
+                test = dic['gfit'][met][str(NI)]['par']['Corr']
+            except (KeyError) as e:
+                dic['gfit'][met][str(NI)]['par']['Corr'] = {}
+            if len(peaks) > 0 :
+                NIlist = []
+                par_sing_list = []
+                par_sing_list_e = []
+                par_glob_list = []
+                par_glob_list_e = []
+                for peak in peaks:
+                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
+                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
+                    par_sing = sf['par']['%s_v'%par]
+                    par_sing_e = sf['par']['%s_e'%par]
+                    par_glob = gf['par']['%s_v'%par]
+                    par_glob_e = gf['par']['%s_e'%par]
+                    NIlist.append(float(NI))
+                    par_sing_list.append(par_sing)
+                    par_sing_list_e.append(par_sing_e)
+                    par_glob_list.append(par_glob)
+                    par_glob_list_e.append(par_glob_e)
+            NI_pear = array([NIlist,par_sing_list,par_sing_list_e,par_glob_list,par_glob_list_e]).T
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_data'%par] = NI_pear
+            Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,3])
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff'%par] = Pearson_Corr_Coeff
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value'%par] = Pearson_Corr_Coeff_tailed_p_value
+            lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,3])
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope'%par] = lin_slope
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter'%par] = lin_inter
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value'%par] = lin_r_value
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value'%par] = lin_p_value
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err'%par] = lin_std_err
+            single_x = NI_pear[:,1][:,np.newaxis]
+            glob_x = NI_pear[:,3][:,np.newaxis]
+            slope, _, _, _ = np.linalg.lstsq(single_x, glob_x)
+            slope = float(slope)
+            dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope'%par] = slope
     return()
 
 ################ Plot functions ###########################
@@ -1084,12 +1201,6 @@ def plotdecays(dics,mets=False,peaks=False,NIa=False,fss=[0]):
     return()
 
 def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
-#    fig = figure(figsize=(figsize, figsize/1.618))
-#    ax = fig.add_subplot(111)
-#    ax.plot(time_arr_s,R2eff_arr_s,"o")
-#    ax.plot(time_arr_s,dic_R2s['Yfit'],"-")
-#    ax.plot(time_arr_s,dic_R2cpmg_fast['Yfit'],"-")
-#    show()             
     for dic in dics:
         desc_name = dic['desc']['name']
         if not mets: mets = dic['qMDDmet'][0]
@@ -1112,33 +1223,34 @@ def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
                         datY_f_R2s = X_Y_Fit[:,1]
                         calcR2s = X_Y_Fit[:,2]
                         par_R2s = dc['R2s']['par']
-                        datXs_f_R2s_lin = linspace(datX_f_R2s[0],datX_f_R2s[-1],100)
+                        datXs_f_R2s_lin = linspace(datX_f_R2s[0],datX_f_R2s[-1],500)
                         datYs_f_R2s_lin = f_R2s_calc(par_R2s,datXs_f_R2s_lin)
-                        ax.errorbar(datX_f_R2s, datY_f_R2s,fmt='.',label='%s %s-%s %s. R1=%3.2f+-%3.2f '%(met, peak, peakname, NI, par_R2s['R2_v'], par_R2s['R2_e']))
+                        ax.errorbar(datX_f_R2s, datY_f_R2s,fmt='.',label='%s %s-%s %s. R2=%3.2f+-%3.2f '%(met, peak, peakname, NI, par_R2s['R2_v'], par_R2s['R2_e']))
                         ax.plot(datX_f_R2s,datY_f_R2s,"-")
                         ax.plot(datXs_f_R2s_lin,datYs_f_R2s_lin,"-",color=ax.lines[-1].get_color())
                         ax.plot(datX_f_R2s,calcR2s,"o",mfc='none',mec=ax.lines[-1].get_color())#
                     if Pval!=False:
-                        figR2cpmg_fast = figure('R2cpmg_fast_%s_%s_%s'%(NI,peak,desc_name),figsize=(figsize, figsize/1.618))
-                        bx = figR2cpmg_fast.add_subplot(111)
-                        # Get values for R2cpmg_fast
-                        X_Y_Fit_exch = dc['R2cpmg_fast']['X_Y_Fit']
-                        datX_f_R2cpmg_fast = X_Y_Fit_exch[:,0]
-                        datY_f_R2cpmg_fast = X_Y_Fit_exch[:,1]
-                        calcR2cpmg_fast = X_Y_Fit_exch[:,2]
-                        par_R2cpmg_fast = dc['R2cpmg_fast']['par']
-                        datXs_f_R2cpmg_fast_lin = linspace(datX_f_R2cpmg_fast[0],datX_f_R2cpmg_fast[-1],100)
-                        datYs_f_R2cpmg_fast_lin = f_R2cpmg_fast_calc(par_R2cpmg_fast,datXs_f_R2cpmg_fast_lin )
-                        bx.errorbar(datX_f_R2cpmg_fast, datY_f_R2cpmg_fast,fmt='.',label='%s %s-%s %s.'%(met, peak, peakname, NI))
-                        bx.plot(datX_f_R2cpmg_fast,datY_f_R2cpmg_fast,"-")
-                        bx.plot(datXs_f_R2cpmg_fast_lin,datYs_f_R2cpmg_fast_lin,"-",color=bx.lines[-1].get_color())
-                        bx.plot(datX_f_R2cpmg_fast,calcR2cpmg_fast,"o",mfc='none',mec=bx.lines[-1].get_color())#
-                        #R2cpmg_fast graph
-                        bx.set_title('R2cpmg fast fitting')
+                        figR2cpmg_slow = figure('R2cpmg_slow_%s_%s_%s'%(NI,peak,desc_name),figsize=(figsize, figsize/1.618))
+                        bx = figR2cpmg_slow.add_subplot(111)
+                        # Get values for R2cpmg_slow
+                        X_Y_Fit_exch = dc['R2cpmg_slow']['X_Y_Fit']
+                        datX_f_R2cpmg_slow = X_Y_Fit_exch[:,0]
+                        datY_f_R2cpmg_slow = X_Y_Fit_exch[:,1]
+                        calcR2cpmg_slow = X_Y_Fit_exch[:,2]
+                        par_R2cpmg_slow = dc['R2cpmg_slow']['par']
+                        datXs_f_R2cpmg_slow_lin = linspace(datX_f_R2cpmg_slow[0],datX_f_R2cpmg_slow[-1],500)
+                        datYs_f_R2cpmg_slow_lin = f_R2cpmg_slow_calc(par_R2cpmg_slow,datXs_f_R2cpmg_slow_lin )
+                        bx.errorbar(datX_f_R2cpmg_slow, datY_f_R2cpmg_slow,fmt='.',
+                        label='%s %s-%s %s. R2=%3.2f ka=%3.2f Domega=%3.2f'%(met, peak, peakname, NI,par_R2cpmg_slow['R2_v'],par_R2cpmg_slow['ka_v'],par_R2cpmg_slow['Domega_v']))
+                        #bx.plot(datX_f_R2cpmg_slow,datY_f_R2cpmg_slow,"-")
+                        bx.plot(datXs_f_R2cpmg_slow_lin,datYs_f_R2cpmg_slow_lin,"-",color=bx.lines[-1].get_color())
+                        bx.plot(datX_f_R2cpmg_slow,calcR2cpmg_slow,"o",mfc='none',mec=bx.lines[-1].get_color())#
+                        #R2cpmg_slow graph
+                        bx.set_title('R2cpmg slow fitting')
                         bx.set_xlabel('Time')
-                        bx.set_ylabel('R2cpmg fast coef')
+                        bx.set_ylabel('R2cpmg slow coef')
                         box = bx.get_position()
-                        bx.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+                        bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
                         bx.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
                         bx.grid('on')
                 #R1r graph
@@ -1146,7 +1258,7 @@ def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
                 ax.set_xlabel('Time')
                 ax.set_ylabel('R2 coef')
                 box = ax.get_position()
-                ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+                ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
                 ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
                 ax.grid('on')
     print "Write: show() , to see graphs"
@@ -1234,7 +1346,7 @@ def plotrates(dics,mets=False,peaks=False,NIa=False):
     #show()
     return()
 
-def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
+def plot_kEX(dics,mets=False,NIstop=False):
     for dic in dics:
         desc_name = dic['desc']['name']
         fig = figure(desc_name,figsize=(figsize, figsize/1.618))
@@ -1301,15 +1413,15 @@ def plot_kEX(dics,mets=False,peaks=False,NIstop=False):
     print "Write: show() , to see graphs"
     #show()
     return()
-def plot_glob_props(dic,mets=False,NIstop=False):
+
+def plot_glob_props(dic,pars,mets=False,NIstop=False):
     if not mets: mets = dic['qMDDmet'][0]
-    plot_chisqr_glob_single_prop(dic,mets,NIstop)
-    plot_phi_glob_single_prop(dic,mets,NIstop)
-    plot_R1_glob_single_prop(dic,mets,NIstop)
-    plot_R2_glob_single_prop(dic,mets,NIstop)
+    plot_chisqr_glob_prop(dic,mets,NIstop)
+    for par in pars:
+        plot_par_glob_prop(dic,par,mets,NIstop)
     return()
 
-def plot_chisqr_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
+def plot_chisqr_glob_prop(dics,mets=False,NIstop=False):
     for dic in dics:
         desc_name = dic['desc']['name']
         fig = figure('chisqr_%s'%desc_name,figsize=(figsize, figsize/1.618))
@@ -1385,10 +1497,10 @@ def plot_chisqr_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
     #show()
     return()
 
-def plot_phi_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
+def plot_par_glob_prop(dics,par,mets=False,NIstop=False):
     for dic in dics:
         desc_name = dic['desc']['name']
-        fig = figure('phi_%s'%desc_name,figsize=(figsize, figsize/1.618))
+        fig = figure('%s_%s'%(par,desc_name),figsize=(figsize, figsize/1.618))
         if not mets: mets = dic['qMDDmet'][0]
         imets = 0
         for met in mets:
@@ -1397,9 +1509,9 @@ def plot_phi_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
             NIarr = dic['NIarr'][met]
             NImax = dic['NImax'][met]
             NI_X = []
-            phi_prop_list = []
-            phi_prop_peak_list_NI = array([])
-            phi_prop_peak_list = array([])
+            par_prop_list = []
+            par_prop_peak_list_NI = array([])
+            par_prop_peak_list = array([])
             peak_plot_list = []
             for NI in NIarr:
                 if NIstop:
@@ -1414,33 +1526,33 @@ def plot_phi_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
-                phi_prop_dic = gf['phi_prop']
-                phi_prop_NI = 1.0-phi_prop_dic[:,0]/float(NImax)
-                phi_prop = phi_prop_dic[:,1]
-                phi_mean = np.mean(phi_prop)
-                phi_min = phi_prop.min()
-                phi_max = phi_prop.max()
-                phi_rmsd = np.sqrt(np.mean((phi_prop-phi_mean)**2))
-                phi_prop_list.append([phi_mean,phi_min,phi_max,phi_rmsd])
-                phi_prop_peak_list_NI = np.concatenate((phi_prop_peak_list_NI, phi_prop_NI))
-                phi_prop_peak_list = np.concatenate((phi_prop_peak_list, phi_prop))
+                par_prop_dic = gf['par']['%s_prop'%par]
+                par_prop_NI = 1.0-par_prop_dic[:,0]/float(NImax)
+                par_prop = par_prop_dic[:,1]
+                par_mean = np.mean(par_prop)
+                par_min = par_prop.min()
+                par_max = par_prop.max()
+                par_rmsd = np.sqrt(np.mean((par_prop-par_mean)**2))
+                par_prop_list.append([par_mean,par_min,par_max,par_rmsd])
+                par_prop_peak_list_NI = np.concatenate((par_prop_peak_list_NI, par_prop_NI))
+                par_prop_peak_list = np.concatenate((par_prop_peak_list, par_prop))
                 peak_plot_list.append([len(gfit_peaks),len(Pval_peaks),len(gfit_peaks_in_Pval)])
 
             NI_X = 1.0-array(NI_X)/float(NImax)
             #
-            ax.plot(phi_prop_peak_list_NI,phi_prop_peak_list,'.',c='b')
+            #ax.plot(par_prop_peak_list_NI,par_prop_peak_list,'.',c='b') # All peaks proportion
             peak_plot_arr = array(peak_plot_list).T
             ax2.plot(NI_X, peak_plot_arr[0],'o',c='b',label='Peaks used for global fit')
             ax2.plot(NI_X, peak_plot_arr[1],'o',c='r',label='Ftest peaks')
             ax2.plot(NI_X, peak_plot_arr[2],'s',markersize=8,c='g',alpha=0.5,label='Fitted peaks in Ftest')
             #
-            phi_prop_arr = array(phi_prop_list).T
-            ax.errorbar(NI_X,phi_prop_arr[0],yerr=phi_prop_arr[3],marker='s',c='b',label='%s \nphi proportion \nglobal fit/single fit'%(met)) #ax.lines[-1].get_color()
-            ax.plot(NI_X,phi_prop_arr[1],c='b',alpha=0.1)
-            ax.plot(NI_X,phi_prop_arr[2],c='b',alpha=0.1)
+            par_prop_arr = array(par_prop_list).T
+            ax.errorbar(NI_X,par_prop_arr[0],yerr=par_prop_arr[3],marker='s',c='b',label='%s \n%s proportion \nglobal fit/single fit'%(met,par)) #ax.lines[-1].get_color() #Rmsd for peaks proportion
+            ax.plot(NI_X,par_prop_arr[1],c='b',alpha=0.1) #Upper graph
+            ax.plot(NI_X,par_prop_arr[2],c='b',alpha=0.1) #Lower graph
             imets+=1
             #
-            ax.set_ylabel('phi prop')
+            ax.set_ylabel('%s prop'%par)
             ax.set_ylim(0,10)
             ax.set_xlabel('Sparseness')
             box = ax.get_position()
@@ -1461,10 +1573,50 @@ def plot_phi_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
     #show()
     return()
 
-def plot_R1_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
+def plot_single_pearson(dic,par,mets=False,NIa=False):
+    if not mets: mets = dic['qMDDmet'][0]
+    if not NIa: NIarr = dic['NIarr'][met][:2] #
+    else: NIarr = NIa
+    for NI in NIarr:
+        fig = figure('Pearson_NI=%s, par=%s'%(NI,par),figsize=(figsize, figsize/1.618))
+        imet = 1
+        for met in mets:
+            ax = fig.add_subplot('%s1%s'%(len(mets),imet))
+            data = dic['gfit'][met][str(NI)]['par']['Corr']['%s_data'%par]
+            Pearson_Corr_Coeff = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff'%par]
+            Pearson_Corr_Coeff_tailed_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value'%par]
+            lin_slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope'%par]
+            lin_inter = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter'%par]
+            lin_r_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value'%par]
+            lin_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value'%par]
+            lin_std_err = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err'%par]
+            slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope'%par]
+            ax.errorbar(data[:,1],data[:,3],xerr=data[:,2],yerr=data[:,4],fmt='.',label='%s %s'%(met,par)) #ax.lines[-1].get_color()
+            ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1])),'-',color=ax.lines[-1].get_color(),label='Slope=1')
+            ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1]))*slope,'-',label='a=%3.2f, pearson=%3.2f'%(slope,Pearson_Corr_Coeff))
+            ax.set_ylabel('Global fit')
+            ax.set_xlabel('Single fit')
+            ax.set_ylim(0,max(data[:,1]*1.05))
+            ax.set_xlim(0,max(data[:,1]*1.05))
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+            ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.95),prop={'size':8}) # Put a legend to the right of the current axis
+            ax.grid('on')
+            imet+=1
+        print "Write: show() , to see graphs"
+    return()
+
+def plot_glob_pearsons(dic,pars,mets=False,NIstop=False):
+    if not mets: mets = dic['qMDDmet'][0]
+    plot_chisqr_glob_pearson(dic,mets,NIstop)
+    for par in pars:
+        plot_glob_pearson(dic,par,mets,NIstop)
+    return()
+
+def plot_chisqr_glob_pearson(dics,mets=False,NIstop=False):
     for dic in dics:
         desc_name = dic['desc']['name']
-        fig = figure('R1_%s'%desc_name,figsize=(figsize, figsize/1.618))
+        fig = figure('chisqr_%s'%(desc_name),figsize=(figsize, figsize/1.618))
         if not mets: mets = dic['qMDDmet'][0]
         imets = 0
         for met in mets:
@@ -1473,9 +1625,7 @@ def plot_R1_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
             NIarr = dic['NIarr'][met]
             NImax = dic['NImax'][met]
             NI_X = []
-            R1_prop_list = []
-            R1_prop_peak_list_NI = array([])
-            R1_prop_peak_list = array([])
+            chisqr_prop_list = []
             peak_plot_list = []
             for NI in NIarr:
                 if NIstop:
@@ -1484,40 +1634,29 @@ def plot_R1_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
                 else:
                     if NI <= dic['NIstop']: break
                     else: pass
-                gf = dic['gfit'][met][str(NI)]
+                gf = dic['gfit'][met][str(NI)]['par']['Corr']
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
                 Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
-                R1_prop_dic = gf['R1_prop']
-                R1_prop_NI = 1.0-R1_prop_dic[:,0]/float(NImax)
-                R1_prop = R1_prop_dic[:,1]
-                R1_mean = np.mean(R1_prop)
-                R1_min = R1_prop.min()
-                R1_max = R1_prop.max()
-                R1_rmsd = np.sqrt(np.mean((R1_prop-R1_mean)**2))
-                R1_prop_list.append([R1_mean,R1_min,R1_max,R1_rmsd])
-                R1_prop_peak_list_NI = np.concatenate((R1_prop_peak_list_NI, R1_prop_NI))
-                R1_prop_peak_list = np.concatenate((R1_prop_peak_list, R1_prop))
+                Pearson_Corr_Coeff = gf['chisqr_Pearson_Corr_Coeff']
+                #print Pearson_Corr_Coeff, NI, met
+                chisqr_prop_list.append(Pearson_Corr_Coeff)
                 peak_plot_list.append([len(gfit_peaks),len(Pval_peaks),len(gfit_peaks_in_Pval)])
 
             NI_X = 1.0-array(NI_X)/float(NImax)
-            #
-            ax.plot(R1_prop_peak_list_NI,R1_prop_peak_list,'.',c='b')
+            # The thing we want to see
+            ax.plot(NI_X, chisqr_prop_list,'.-',c='b',label='chisqr %s'%(met))
+            # Peak numbers
             peak_plot_arr = array(peak_plot_list).T
             ax2.plot(NI_X, peak_plot_arr[0],'o',c='b',label='Peaks used for global fit')
             ax2.plot(NI_X, peak_plot_arr[1],'o',c='r',label='Ftest peaks')
             ax2.plot(NI_X, peak_plot_arr[2],'s',markersize=8,c='g',alpha=0.5,label='Fitted peaks in Ftest')
-            #
-            R1_prop_arr = array(R1_prop_list).T
-            ax.errorbar(NI_X,R1_prop_arr[0],yerr=R1_prop_arr[3],marker='s',c='b',label='%s \nR1 proportion \nglobal fit/single fit'%(met)) #ax.lines[-1].get_color()
-            ax.plot(NI_X,R1_prop_arr[1],c='b',alpha=0.1)
-            ax.plot(NI_X,R1_prop_arr[2],c='b',alpha=0.1)
             imets+=1
             #
-            ax.set_ylabel('R1 prop')
-            ax.set_ylim(0,10)
+            ax.set_ylabel('chisqr pearson')
+            ax.set_ylim(0.0,1.2)
             ax.set_xlabel('Sparseness')
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
@@ -1537,10 +1676,10 @@ def plot_R1_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
     #show()
     return()
 
-def plot_R2_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
+def plot_glob_pearson(dics,par,mets=False,NIstop=False):
     for dic in dics:
         desc_name = dic['desc']['name']
-        fig = figure('R2_%s'%desc_name,figsize=(figsize, figsize/1.618))
+        fig = figure('%s_%s'%(par,desc_name),figsize=(figsize, figsize/1.618))
         if not mets: mets = dic['qMDDmet'][0]
         imets = 0
         for met in mets:
@@ -1549,9 +1688,9 @@ def plot_R2_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
             NIarr = dic['NIarr'][met]
             NImax = dic['NImax'][met]
             NI_X = []
-            R2_prop_list = []
-            R2_prop_peak_list_NI = array([])
-            R2_prop_peak_list = array([])
+            par_prop_list = []
+#            par_prop_peak_list_NI = array([])
+#            par_prop_peak_list = array([])
             peak_plot_list = []
             for NI in NIarr:
                 if NIstop:
@@ -1560,47 +1699,36 @@ def plot_R2_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
                 else:
                     if NI <= dic['NIstop']: break
                     else: pass
-                gf = dic['gfit'][met][str(NI)]
+                gf = dic['gfit'][met][str(NI)]['par']['Corr']
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
                 Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
-                R2_prop_dic = gf['R2_prop']
-                R2_prop_NI = 1.0-R2_prop_dic[:,0]/float(NImax)
-                R2_prop = R2_prop_dic[:,1]
-                R2_mean = np.mean(R2_prop)
-                R2_min = R2_prop.min()
-                R2_max = R2_prop.max()
-                R2_rmsd = np.sqrt(np.mean((R2_prop-R2_mean)**2))
-                R2_prop_list.append([R2_mean,R2_min,R2_max,R2_rmsd])
-                R2_prop_peak_list_NI = np.concatenate((R2_prop_peak_list_NI, R2_prop_NI))
-                R2_prop_peak_list = np.concatenate((R2_prop_peak_list, R2_prop))
+                Pearson_Corr_Coeff = gf['%s_Pearson_Corr_Coeff'%par]
+                #print Pearson_Corr_Coeff, NI, met
+                par_prop_list.append(Pearson_Corr_Coeff)
                 peak_plot_list.append([len(gfit_peaks),len(Pval_peaks),len(gfit_peaks_in_Pval)])
 
             NI_X = 1.0-array(NI_X)/float(NImax)
-            #
-            ax.plot(R2_prop_peak_list_NI,R2_prop_peak_list,'.',c='b')
+            # The thing we want to see
+            ax.plot(NI_X, par_prop_list,'.-',c='b',label='%s %s'%(par,met))
+            # Peak numbers
             peak_plot_arr = array(peak_plot_list).T
             ax2.plot(NI_X, peak_plot_arr[0],'o',c='b',label='Peaks used for global fit')
             ax2.plot(NI_X, peak_plot_arr[1],'o',c='r',label='Ftest peaks')
             ax2.plot(NI_X, peak_plot_arr[2],'s',markersize=8,c='g',alpha=0.5,label='Fitted peaks in Ftest')
-            #
-            R2_prop_arr = array(R2_prop_list).T
-            ax.errorbar(NI_X,R2_prop_arr[0],yerr=R2_prop_arr[3],marker='s',c='b',label='%s \nR2 proportion \nglobal fit/single fit'%(met)) #ax.lines[-1].get_color()
-            ax.plot(NI_X,R2_prop_arr[1],c='b',alpha=0.1)
-            ax.plot(NI_X,R2_prop_arr[2],c='b',alpha=0.1)
             imets+=1
             #
-            ax.set_ylabel('R2 prop')
-            ax.set_ylim(0,10)
+            ax.set_ylabel('%s pearson'%par)
+            ax.set_ylim(0.0,1.2)
             ax.set_xlabel('Sparseness')
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
             ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.95),prop={'size':8}) # Put a legend to the right of the current axis
             #ax.legend(loc='best')
             ax.grid('on')
-            #
+#            #
             peaks = dic['peakrange'][met]
             ax2.set_ylabel('Number of peaks')
             ax2.set_ylim(0,len(peaks))
@@ -1612,3 +1740,5 @@ def plot_R2_glob_single_prop(dics,mets=False,peaks=False,NIstop=False):
     print "Write: show() , to see graphs"
     #show()
     return()
+
+
