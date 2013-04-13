@@ -135,6 +135,7 @@ def unpack_f_R2cpmg_slow(par,nu,Y,lmf=None):
     dic2['par']['R2_v'] = par['R2'].value; dic2['par']['R2_e'] = par['R2'].stderr
     dic2['par']['Domega_v'] = par['Domega'].value; dic2['par']['Domega_e'] = par['Domega'].stderr
     dic2['par']['ka_v'] = par['ka'].value; dic2['par']['ka_e'] = par['ka'].stderr
+    #print par['ka'].value, par['R2'].value, par['Domega'].value
     residual = Yfit - Y
     #print sum(residual - lmf.residual)
     dic2['residual'] = residual
@@ -148,6 +149,59 @@ def unpack_f_R2cpmg_slow(par,nu,Y,lmf=None):
     dic2['redchisqr'] = chisqr/NDF
     x_y_fit = array([nu,Y,Yfit]).T
     dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
+
+def f_R2cpmg_slow_global(pars,sel_p,nu_a,R2eff_a,R2eff_err_a=None):
+    toterr = np.array([])
+    #print pars['ka'].value
+    for i in range(len(sel_p)):
+        p = sel_p[i]
+        nu =nu_a[i];R2eff=R2eff_a[i]
+        if R2eff_err_a is not None:
+            R2eff_err=R2eff_err_a[i]
+        # Much faster to use a dictionary, and pass to a calc function.
+        par = {'ka_v':pars['ka'].value,'R2_v':pars['R2%s'%p].value,'Domega_v':pars['Domega%s'%p].value}
+        Yfit = f_R2cpmg_slow_calc(par,nu)
+        if R2eff_err_a is None:
+            erri = Yfit - R2eff
+        else:
+            erri = (Yfit - R2eff)/R2eff_err
+        toterr = np.concatenate((toterr, erri))
+    return toterr
+
+def unpack_global_slow(P_arr,sel_p,nu_a,R2eff_a,R2eff_err_a=None,lmf=None):
+    dic2 = {}
+    dic_calc = {}
+    residual_arr = np.array([])
+    for i in range(len(sel_p)):
+        p = sel_p[i]
+        nu =nu_a[i];R2eff=R2eff_a[i]
+        if R2eff_err_a is not None:
+            R2eff_err=R2eff_err_a[i]
+        ka_glob = P_arr['ka']
+        R2 = P_arr['R2%s'%p]
+        Domega = P_arr['Domega%s'%p]
+        dic_calc['par']={}
+        dic_calc['par']['ka_v'] = ka_glob.value; dic_calc['par']['ka_e'] = ka_glob.stderr
+        dic_calc['par']['R2_v'] = R2.value; dic_calc['par']['R2_e'] = R2.stderr
+        dic_calc['par']['Domega_v'] = Domega.value; dic_calc['par']['Domega_e'] = Domega.stderr
+        Yfit = f_R2cpmg_slow_calc(dic_calc['par'],nu)
+        residual = Yfit - R2eff
+        residual_arr = np.concatenate((residual_arr, residual))
+    dic2['par'] = {}
+    dic2['par']['ka_v'] = ka_glob.value; dic2['par']['ka_e'] = ka_glob.stderr
+    #print sum(residual_arr), sum(lmf.residual)
+    dic2['residual'] = residual_arr
+    chisqr = sum(residual_arr**2)
+    #print chisqr, lmf.chisqr, sum(lmf.residual**2)
+    dic2['chisqr'] = chisqr
+    NDF = len(residual_arr)-len(P_arr)
+    #print NDF, lmf.nfree
+    dic2['NDF'] = NDF
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    #x_y_sigma_fit = array([X,Y,sigma,Yfit]).T
+    #dic2['X_Y_Sigma_Fit'] = x_y_sigma_fit
     return(dic2)
 
 ######################################
@@ -565,12 +619,12 @@ def getdecay(dic,mets=False,NIstop=False):
                             dic2 = unpack_f_expdecay(par,datX,datY,lmf)
                             dic['decay'][met][str(NI)][str(peak)][str(fs)].update(dic2)
                             OK_decay = True
-                            dic['rates'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
+                            dic['decay'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
                         except (Exception) as e:
                             print "Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e)
                             logger.info("Cannot fit expdecay for %s %s. Reason: %s"%(peak, peakname, e))
                             OK_decay = False
-                            dic['rates'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
+                            dic['decay'][met][str(NI)][str(peak)]['OK_fit'] = OK_decay
                     # Setting keys
                     offset = dic['offset'][i]
                     omega1 = dic['omega1'][i]
@@ -944,6 +998,94 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                 print "%s No Global fit for NI=%s, since len(peaks):%s"%(met,NI,len(peaks))
     return()
 
+def getglobfit_slow(dic,mets=False,peaklist=False,NIstop=False):
+    dic['gfit'] = {}
+    if not mets: mets = dic['qMDDmet'][0]
+    for met in mets:
+        dic['gfit'][met] = {}
+        NIarr = dic['NIarr'][met]
+        for NI in NIarr:
+            if NIstop:
+                if NI <= NIstop: break
+                else: pass
+            else:
+                if NI <= dic['NIstop']: break
+                else: pass
+            if not peaklist:
+                peaks = dic['relax'][met][str(NI)]['Pval_peaks']# dic['peakrange'][met]
+                testPval = True
+            else:
+                peaks = peaklist
+                testPval = False
+            if len(peaks) > 0 :
+                dic['gfit'][met][str(NI)] = {}
+                nu_arr = []
+                R2eff_arr = []
+                sel_p = []
+                P_arr = lmfit.Parameters(); P_arr.add('ka', value=dic['guess']['g_ka'], vary=True, min=0.0)
+                for peak in peaks:
+                    dc = dic['relax'][met][str(NI)][str(peak)]
+                    peakname = dc['resn']
+                    if testPval:
+                        Pval = dic['relax'][met][str(NI)][str(peak)]['Pval']
+                    else:
+                        Pval = True
+                    OK_fit = dc['R2cpmg_slow']['OK_fit']
+                    if Pval!=False and OK_fit:
+                    # Get values for R2cpmg_slow
+                        dic['gfit'][met][str(NI)][str(peak)] = {}
+                        X_Y_Fit = dc['R2cpmg_slow']['X_Y_Fit']
+                        datX_nu_arr = X_Y_Fit[:,0]
+                        datY_f_R2cpmg_slow = X_Y_Fit[:,1]
+                        FitR2cpmg_slow = X_Y_Fit[:,2]
+                        par_R2cpmg_slow = dc['R2cpmg_slow']['par']
+
+                        R2,Domega= par_R2cpmg_slow['R2_v'],par_R2cpmg_slow['Domega_v']
+                        nu_arr.append(datX_nu_arr)
+                        R2eff_arr.append(datY_f_R2cpmg_slow)
+                        P_arr.add('R2%s'%peak, value=R2, vary=True, min=0.0)
+                        P_arr.add('Domega%s'%peak, value=Domega, vary=True, min=0.0)
+                        sel_p.append(peak)
+                        dic['gfit'][met][str(NI)][str(peak)]['resn'] = peakname
+                dic['gfit'][met][str(NI)]['gfit_peaks'] = sel_p
+                if len(sel_p) > 0 :
+                    # Do global fit
+                    startTime = datetime.now()
+                    print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
+                    print "%s Global fit for NI=%s, %s Peaks:%s"%(met,NI,len(sel_p),sel_p)
+                    lmf_R2cpmg_slow_glob = lmfit.minimize(f_R2cpmg_slow_global, P_arr, args=(sel_p,nu_arr,R2eff_arr),method='leastsq')
+                    # Unpack result into each peak
+                    for i in range(len(sel_p)):
+                        p = sel_p[i]
+                        dc = dic['relax'][met][str(NI)][str(p)]
+                        ka_glob = P_arr['ka']
+                        R2 = P_arr['R2%s'%p]
+                        Domega = P_arr['Domega%s'%p]
+                        par_calc = lmfit.Parameters()
+                        par_calc['ka'] = ka_glob
+                        par_calc['R2'] = R2
+                        par_calc['Domega'] = Domega
+                        X_Y_Fit = dc['R2cpmg_slow']['X_Y_Fit']
+                        datX_nu_arr = X_Y_Fit[:,0]
+                        datY_f_R2cpmg_slow = X_Y_Fit[:,1]
+                        FitR2cpmg_slow = X_Y_Fit[:,2]
+                        #
+                        dic_R2cpmg_slow_glob = unpack_f_R2cpmg_slow(par_calc,datX_nu_arr,datY_f_R2cpmg_slow,lmf_R2cpmg_slow_glob)
+                        dic['gfit'][met][str(NI)][str(p)]['R2cpmg_slow'] = {}
+                        dic['gfit'][met][str(NI)][str(p)]['R2cpmg_slow'].update(dic_R2cpmg_slow_glob)
+                    dic_glob = unpack_global_slow(P_arr,sel_p,nu_arr,R2eff_arr,None,lmf=lmf_R2cpmg_slow_glob)
+                    dic['gfit'][met][str(NI)].update(dic_glob)
+
+                    print "Medthod=%s, NI=%s, ka=%4.4f, chisqr-lmf=%4.4f, chisqr-calc=%4.4f"%(met,NI,ka_glob.value,lmf_R2cpmg_slow_glob.chisqr, dic_glob['chisqr'])
+                    print "It took: %s"%(datetime.now()-startTime)
+                else:
+                    print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
+                    print "%s No Global fit for NI=%s, since len(sel_p):%s"%(met,NI,len(peaks))                    
+            else:
+                print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
+                print "%s No Global fit for NI=%s, since len(peaks):%s"%(met,NI,len(peaks))
+    return()
+
 ##################################
 
 def del_par_props(dic,pars,mets=False,NIstop=False): #TB.del_chisq_prop(BBL,BBL['qMDDmet'])
@@ -975,14 +1117,14 @@ def del_par_props(dic,pars,mets=False,NIstop=False): #TB.del_chisq_prop(BBL,BBL[
                         print "Could not delete key:%s"%e
     return()
 
-def get_glob_props(dic,pars,mets=False,NIstop=False):
+def get_glob_props(dic,pars,mets=False,NIstop=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
-    getglob_chisqr_prop(dic,mets,NIstop)
+    getglob_chisqr_prop(dic,mets,NIstop,gkey,pkey)
     for par in pars:
-        getglob_par_prop(dic,par,mets,NIstop)
+        getglob_par_prop(dic,par,mets,NIstop,gkey,pkey)
     return()
 
-def getglob_chisqr_prop(dic,mets=False,NIstop=False):
+def getglob_chisqr_prop(dic,mets=False,NIstop=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -998,8 +1140,8 @@ def getglob_chisqr_prop(dic,mets=False,NIstop=False):
                 NIlist = []
                 proplist = []
                 for peak in peaks:
-                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
-                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
+                    gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
+                    sf = dic['%s'%gkey][met][str(NI)][str(peak)]['%s'%pkey]
                     chisqr_glob = gf['chisqr']
                     chisqr_sing = sf['chisqr']
                     prop = chisqr_glob/chisqr_sing
@@ -1009,7 +1151,7 @@ def getglob_chisqr_prop(dic,mets=False,NIstop=False):
                 dic['gfit'][met][str(NI)]['chisqr_prop'] = NI_prop
     return()
 
-def getglob_par_prop(dic,par,mets=False,NIstop=False):
+def getglob_par_prop(dic,par,mets=False,NIstop=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -1025,8 +1167,8 @@ def getglob_par_prop(dic,par,mets=False,NIstop=False):
                 NIlist = []
                 proplist = []
                 for peak in peaks:
-                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
-                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
+                    gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
+                    sf = dic['%s'%gkey][met][str(NI)][str(peak)]['%s'%pkey]
                     par_glob = gf['par']['%s_v'%par]
                     par_sing = sf['par']['%s_v'%par]
                     prop = par_glob/par_sing
@@ -1036,14 +1178,14 @@ def getglob_par_prop(dic,par,mets=False,NIstop=False):
                 dic['gfit'][met][str(NI)]['par']['%s_prop'%par] = NI_prop
     return()
 
-def get_glob_pearsons(dic,pars,mets=False,NIstop=False):
+def get_glob_pearsons(dic,pars,mets=False,NIstop=False,Ini=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
-    getglob_chisqr_pearson(dic,mets,NIstop)
+    getglob_chisqr_pearson(dic,mets,NIstop,Ini,gkey,pkey)
     for par in pars:
-        getglob_par_pearson(dic,par,mets,NIstop)
+        getglob_par_pearson(dic,par,mets,NIstop,Ini,gkey,pkey)
     return()
 
-def getglob_chisqr_pearson(dic,mets=False,NIstop=False):
+def getglob_chisqr_pearson(dic,mets=False,NIstop=False,Ini=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -1055,32 +1197,38 @@ def getglob_chisqr_pearson(dic,mets=False,NIstop=False):
                 if NI <= dic['NIstop']: break
                 else: pass
             peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-            if len(peaks) > 0 :
+            try:
+                test = dic['gfit'][met][str(NI)]['par']['Corr']
+            except (KeyError) as e:
+                dic['gfit'][met][str(NI)]['par']['Corr'] = {}
+            if len(peaks) > 0:
+                if not Ini: NIsf = NI; t = ''
+                else: NIsf = max(NIarr); t = '_ini'
                 NIlist = []
                 chisqr_sing_list = []
                 chisqr_glob_list = []
                 for peak in peaks:
-                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
-                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
+                    gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
+                    sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
                     chisqr_sing = sf['chisqr'] 
                     chisqr_glob = gf['chisqr']
                     NIlist.append(float(NI))
                     chisqr_sing_list.append(chisqr_sing)
                     chisqr_glob_list.append(chisqr_glob)
-            NI_pear = array([NIlist,chisqr_sing_list,chisqr_glob_list]).T
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_data'] = NI_pear
-            Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,2])
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff'] = Pearson_Corr_Coeff
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff_tailed_p_value'] = Pearson_Corr_Coeff_tailed_p_value
-            lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,2])
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_slope'] = lin_slope
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_inter'] = lin_inter
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_r_value'] = lin_r_value
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_p_value'] = lin_p_value
-            dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_std_err'] = lin_std_err
+                NI_pear = array([NIlist,chisqr_sing_list,chisqr_glob_list]).T
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_data%s'%(t)] = NI_pear
+                Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,2])
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff%s'%(t)] = Pearson_Corr_Coeff
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_Pearson_Corr_Coeff_tailed_p_value%s'%(t)] = Pearson_Corr_Coeff_tailed_p_value
+                lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,2])
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_slope%s'%(t)] = lin_slope
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_inter%s'%(t)] = lin_inter
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_r_value%s'%(t)] = lin_r_value
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_p_value%s'%(t)] = lin_p_value
+                dic['gfit'][met][str(NI)]['par']['Corr']['chisqr_lin_std_err%s'%(t)] = lin_std_err
     return()
 
-def getglob_par_pearson(dic,par,mets=False,NIstop=False):
+def getglob_par_pearson(dic,par,mets=False,NIstop=False,Ini=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
     for met in mets:
         NIarr = dic['NIarr'][met]
@@ -1097,14 +1245,16 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False):
             except (KeyError) as e:
                 dic['gfit'][met][str(NI)]['par']['Corr'] = {}
             if len(peaks) > 0 :
+                if not Ini: NIsf = NI; t = ''
+                else: NIsf = max(NIarr); t = '_ini'
                 NIlist = []
                 par_sing_list = []
                 par_sing_list_e = []
                 par_glob_list = []
                 par_glob_list_e = []
                 for peak in peaks:
-                    gf = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']
-                    sf = dic['rates'][met][str(NI)][str(peak)]['R1r_exch']
+                    gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
+                    sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
                     par_sing = sf['par']['%s_v'%par]
                     par_sing_e = sf['par']['%s_e'%par]
                     par_glob = gf['par']['%s_v'%par]
@@ -1114,22 +1264,22 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False):
                     par_sing_list_e.append(par_sing_e)
                     par_glob_list.append(par_glob)
                     par_glob_list_e.append(par_glob_e)
-            NI_pear = array([NIlist,par_sing_list,par_sing_list_e,par_glob_list,par_glob_list_e]).T
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_data'%par] = NI_pear
-            Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,3])
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff'%par] = Pearson_Corr_Coeff
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value'%par] = Pearson_Corr_Coeff_tailed_p_value
-            lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,3])
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope'%par] = lin_slope
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter'%par] = lin_inter
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value'%par] = lin_r_value
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value'%par] = lin_p_value
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err'%par] = lin_std_err
-            single_x = NI_pear[:,1][:,np.newaxis]
-            glob_x = NI_pear[:,3][:,np.newaxis]
-            slope, _, _, _ = np.linalg.lstsq(single_x, glob_x)
-            slope = float(slope)
-            dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope'%par] = slope
+                NI_pear = array([NIlist,par_sing_list,par_sing_list_e,par_glob_list,par_glob_list_e]).T
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_data%s'%(par,t)] = NI_pear
+                Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,3])
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff%s'%(par,t)] = Pearson_Corr_Coeff
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value%s'%(par,t)] = Pearson_Corr_Coeff_tailed_p_value
+                lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,3])
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope%s'%(par,t)] = lin_slope
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter%s'%(par,t)] = lin_inter
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value%s'%(par,t)] = lin_r_value
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value%s'%(par,t)] = lin_p_value
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err%s'%(par,t)] = lin_std_err
+                single_x = NI_pear[:,1][:,np.newaxis]
+                glob_x = NI_pear[:,3][:,np.newaxis]
+                slope, _, _, _ = np.linalg.lstsq(single_x, glob_x)
+                slope = float(slope)
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope%s'%(par,t)] = slope
     return()
 
 ################ Plot functions ###########################
@@ -1346,7 +1496,7 @@ def plotrates(dics,mets=False,peaks=False,NIa=False):
     #show()
     return()
 
-def plot_kEX(dics,mets=False,NIstop=False):
+def plot_globalpar(dics,mets=False,NIstop=False,globalpar='kEX',gkey='rates',ay=False,by=False):
     for dic in dics:
         desc_name = dic['desc']['name']
         fig = figure(desc_name,figsize=(figsize, figsize/1.618))
@@ -1358,8 +1508,8 @@ def plot_kEX(dics,mets=False,NIstop=False):
             NIarr = dic['NIarr'][met]
             NImax = dic['NImax'][met]
             NI_X = []
-            kEX_Y = []
-            kEX_Y_e= []
+            globalpar_Y = []
+            globalpar_Y_e= []
             chisqr_Y = []
             chisqr_prop_list = []
             chisqr_prop_peak_list_NI = array([])
@@ -1373,29 +1523,30 @@ def plot_kEX(dics,mets=False,NIstop=False):
                     if NI <= dic['NIstop']: break
                     else: pass
                 gf = dic['gfit'][met][str(NI)]
-                kEX = gf['par']['kEX_v']
-                kEX_e = gf['par']['kEX_e']
+
+                globalpar_v = gf['par']['%s_v'%globalpar]
+                globalpar_e = gf['par']['%s_e'%globalpar]
                 chisqr = gf['chisqr']
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-                Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
+                Pval_peaks = dic['%s'%gkey][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
-                kEX_Y.append(kEX)
-                kEX_Y_e.append(kEX_e)
+                globalpar_Y.append(globalpar_v)
+                globalpar_Y_e.append(globalpar_e)
                 chisqr_Y.append(chisqr)
             NI_X = 1.0-array(NI_X)/float(NImax)
-            kEX_Y = array(kEX_Y)
-            kEX_Y_e= array(kEX_Y_e)
+            globalpar_Y = array(globalpar_Y)
+            globalpar_Y_e= array(globalpar_Y_e)
             chisqr_Y = array(chisqr_Y)
-            ax.errorbar(NI_X, kEX_Y,yerr=kEX_Y_e,fmt='.-',label='%s'%(met))
+            ax.errorbar(NI_X, globalpar_Y,yerr=globalpar_Y_e,fmt='.-',label='%s'%(met))
             bx.plot(NI_X,chisqr_Y,'-',label='%s'%(met))
-    ax.plot(NI_X,ones(len(NI_X))*kEX_Y[0],c='k')
-    ax.annotate('kEX=%3.1f'%(kEX_Y[0]), xy=(NI_X[0],kEX_Y[0]), xycoords='data', xytext=(0.5*NI_X[1],kEX_Y[0]+0.05*kEX_Y[0]), textcoords='data') #'axes fraction'
+    ax.plot(NI_X,ones(len(NI_X))*globalpar_Y[0],c='k')
+    ax.annotate('%s=%3.1f'%(globalpar,globalpar_Y[0]), xy=(NI_X[0],globalpar_Y[0]), xycoords='data', xytext=(0.5*NI_X[1],globalpar_Y[0]+0.05*globalpar_Y[0]), textcoords='data') #'axes fraction'
     bx.plot(NI_X,ones(len(NI_X))*chisqr_Y[0],c='k')
-    ax.set_title('Global kEX fitting')
+    ax.set_title('Global %s fitting'%globalpar)
     #
-    ax.set_ylabel('kEX')
-    ax.set_ylim(8000,20000)
+    ax.set_ylabel('%s'%globalpar)
+    if ay: ax.set_ylim(ay[0],ay[1])
     #box = ax.get_position()
     #ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
     #ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
@@ -1403,7 +1554,7 @@ def plot_kEX(dics,mets=False,NIstop=False):
     ax.grid('on')
     #
     bx.set_ylabel('chisqr')
-    bx.set_ylim(0,5000)
+    if by: bx.set_ylim(by[0],by[1])
     bx.set_xlabel('Sparseness')
     #box = bx.get_position()
     #bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
@@ -1414,14 +1565,14 @@ def plot_kEX(dics,mets=False,NIstop=False):
     #show()
     return()
 
-def plot_glob_props(dic,pars,mets=False,NIstop=False):
+def plot_glob_props(dic,pars,mets=False,NIstop=False,gkey='rates'):
     if not mets: mets = dic['qMDDmet'][0]
-    plot_chisqr_glob_prop(dic,mets,NIstop)
+    plot_chisqr_glob_prop(dic,mets,NIstop,gkey)
     for par in pars:
-        plot_par_glob_prop(dic,par,mets,NIstop)
+        plot_par_glob_prop(dic,par,mets,NIstop,gkey)
     return()
 
-def plot_chisqr_glob_prop(dics,mets=False,NIstop=False):
+def plot_chisqr_glob_prop(dics,mets=False,NIstop=False,gkey='rates'):
     for dic in dics:
         desc_name = dic['desc']['name']
         fig = figure('chisqr_%s'%desc_name,figsize=(figsize, figsize/1.618))
@@ -1446,7 +1597,7 @@ def plot_chisqr_glob_prop(dics,mets=False,NIstop=False):
                     else: pass
                 gf = dic['gfit'][met][str(NI)]
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-                Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
+                Pval_peaks = dic['%s'%gkey][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
@@ -1497,7 +1648,7 @@ def plot_chisqr_glob_prop(dics,mets=False,NIstop=False):
     #show()
     return()
 
-def plot_par_glob_prop(dics,par,mets=False,NIstop=False):
+def plot_par_glob_prop(dics,par,mets=False,NIstop=False,gkey='rates'):
     for dic in dics:
         desc_name = dic['desc']['name']
         fig = figure('%s_%s'%(par,desc_name),figsize=(figsize, figsize/1.618))
@@ -1522,7 +1673,7 @@ def plot_par_glob_prop(dics,par,mets=False,NIstop=False):
                     else: pass
                 gf = dic['gfit'][met][str(NI)]
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-                Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
+                Pval_peaks = dic['%s'%gkey][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
@@ -1573,29 +1724,33 @@ def plot_par_glob_prop(dics,par,mets=False,NIstop=False):
     #show()
     return()
 
-def plot_single_pearson(dic,par,mets=False,NIa=False):
+def plot_single_pearson(dic,par,mets=False,NIa=False,Ini=False):
     if not mets: mets = dic['qMDDmet'][0]
     if not NIa: NIarr = dic['NIarr'][met][:2] #
     else: NIarr = NIa
+    print NIarr
     for NI in NIarr:
-        fig = figure('Pearson_NI=%s, par=%s'%(NI,par),figsize=(figsize, figsize/1.618))
+        if not Ini: t = ''
+        else: t = '_ini'
+        fig = figure('Pearson_NI=%s, par=%s %s'%(NI,par,t),figsize=(figsize, figsize/1.618))
         imet = 1
         for met in mets:
             ax = fig.add_subplot('%s1%s'%(len(mets),imet))
-            data = dic['gfit'][met][str(NI)]['par']['Corr']['%s_data'%par]
-            Pearson_Corr_Coeff = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff'%par]
-            Pearson_Corr_Coeff_tailed_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value'%par]
-            lin_slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope'%par]
-            lin_inter = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter'%par]
-            lin_r_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value'%par]
-            lin_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value'%par]
-            lin_std_err = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err'%par]
+            data = dic['gfit'][met][str(NI)]['par']['Corr']['%s_data%s'%(par,t)]
+            Pearson_Corr_Coeff = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff%s'%(par,t)]
+            Pearson_Corr_Coeff_tailed_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value%s'%(par,t)]
+            lin_slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope%s'%(par,t)]
+            lin_inter = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_inter%s'%(par,t)]
+            lin_r_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_r_value%s'%(par,t)]
+            lin_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_p_value%s'%(par,t)]
+            lin_std_err = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_std_err%s'%(par,t)]
             slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope'%par]
-            ax.errorbar(data[:,1],data[:,3],xerr=data[:,2],yerr=data[:,4],fmt='.',label='%s %s'%(met,par)) #ax.lines[-1].get_color()
+            ax.errorbar(data[:,1],data[:,3],xerr=data[:,2],yerr=data[:,4],fmt='.',label='%s %s %s'%(met,par,t)) #ax.lines[-1].get_color()
             ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1])),'-',color=ax.lines[-1].get_color(),label='Slope=1')
             ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1]))*slope,'-',label='a=%3.2f, pearson=%3.2f'%(slope,Pearson_Corr_Coeff))
             ax.set_ylabel('Global fit')
-            ax.set_xlabel('Single fit')
+            if not Ini: ax.set_xlabel('Single fit')
+            else: ax.set_xlabel('Initial global fit')
             ax.set_ylim(0,max(data[:,1]*1.05))
             ax.set_xlim(0,max(data[:,1]*1.05))
             box = ax.get_position()
@@ -1606,17 +1761,19 @@ def plot_single_pearson(dic,par,mets=False,NIa=False):
         print "Write: show() , to see graphs"
     return()
 
-def plot_glob_pearsons(dic,pars,mets=False,NIstop=False):
+def plot_glob_pearsons(dic,pars,mets=False,NIstop=False,Ini=False,gkey='rates'):
     if not mets: mets = dic['qMDDmet'][0]
-    plot_chisqr_glob_pearson(dic,mets,NIstop)
+    plot_chisqr_glob_pearson(dic,mets,NIstop,Ini,gkey)
     for par in pars:
-        plot_glob_pearson(dic,par,mets,NIstop)
+        plot_glob_pearson(dic,par,mets,NIstop,Ini,gkey)
     return()
 
-def plot_chisqr_glob_pearson(dics,mets=False,NIstop=False):
+def plot_chisqr_glob_pearson(dics,mets=False,NIstop=False,Ini=False,gkey='rates'):
     for dic in dics:
         desc_name = dic['desc']['name']
-        fig = figure('chisqr_%s'%(desc_name),figsize=(figsize, figsize/1.618))
+        if not Ini: t = ''
+        else: t = '_ini'
+        fig = figure('chisqr_%s%s'%(desc_name,t),figsize=(figsize, figsize/1.618))
         if not mets: mets = dic['qMDDmet'][0]
         imets = 0
         for met in mets:
@@ -1636,18 +1793,18 @@ def plot_chisqr_glob_pearson(dics,mets=False,NIstop=False):
                     else: pass
                 gf = dic['gfit'][met][str(NI)]['par']['Corr']
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-                Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
+                Pval_peaks = dic['%s'%gkey][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
-                Pearson_Corr_Coeff = gf['chisqr_Pearson_Corr_Coeff']
+                Pearson_Corr_Coeff = gf['chisqr_Pearson_Corr_Coeff%s'%(t)]
                 #print Pearson_Corr_Coeff, NI, met
                 chisqr_prop_list.append(Pearson_Corr_Coeff)
                 peak_plot_list.append([len(gfit_peaks),len(Pval_peaks),len(gfit_peaks_in_Pval)])
 
             NI_X = 1.0-array(NI_X)/float(NImax)
             # The thing we want to see
-            ax.plot(NI_X, chisqr_prop_list,'.-',c='b',label='chisqr %s'%(met))
+            ax.plot(NI_X, chisqr_prop_list,'.-',c='b',label='chisqr %s %s'%(met,t))
             # Peak numbers
             peak_plot_arr = array(peak_plot_list).T
             ax2.plot(NI_X, peak_plot_arr[0],'o',c='b',label='Peaks used for global fit')
@@ -1676,10 +1833,12 @@ def plot_chisqr_glob_pearson(dics,mets=False,NIstop=False):
     #show()
     return()
 
-def plot_glob_pearson(dics,par,mets=False,NIstop=False):
+def plot_glob_pearson(dics,par,mets=False,NIstop=False,Ini=False,gkey='rates'):
     for dic in dics:
         desc_name = dic['desc']['name']
-        fig = figure('%s_%s'%(par,desc_name),figsize=(figsize, figsize/1.618))
+        if not Ini: t = ''
+        else: t = '_ini'
+        fig = figure('%s_%s%s'%(par,desc_name,t),figsize=(figsize, figsize/1.618))
         if not mets: mets = dic['qMDDmet'][0]
         imets = 0
         for met in mets:
@@ -1701,18 +1860,18 @@ def plot_glob_pearson(dics,par,mets=False,NIstop=False):
                     else: pass
                 gf = dic['gfit'][met][str(NI)]['par']['Corr']
                 gfit_peaks = dic['gfit'][met][str(NI)]['gfit_peaks']
-                Pval_peaks = dic['rates'][met][str(NI)]['Pval_peaks']
+                Pval_peaks = dic['%s'%gkey][met][str(NI)]['Pval_peaks']
                 gfit_peaks_in_Pval = [x for x in gfit_peaks if x in Pval_peaks]
                 NI_X.append(NI)
                 #
-                Pearson_Corr_Coeff = gf['%s_Pearson_Corr_Coeff'%par]
+                Pearson_Corr_Coeff = gf['%s_Pearson_Corr_Coeff%s'%(par,t)]
                 #print Pearson_Corr_Coeff, NI, met
                 par_prop_list.append(Pearson_Corr_Coeff)
                 peak_plot_list.append([len(gfit_peaks),len(Pval_peaks),len(gfit_peaks_in_Pval)])
 
             NI_X = 1.0-array(NI_X)/float(NImax)
             # The thing we want to see
-            ax.plot(NI_X, par_prop_list,'.-',c='b',label='%s %s'%(par,met))
+            ax.plot(NI_X, par_prop_list,'.-',c='b',label='%s %s %s'%(par,met,t))
             # Peak numbers
             peak_plot_arr = array(peak_plot_list).T
             ax2.plot(NI_X, peak_plot_arr[0],'o',c='b',label='Peaks used for global fit')
