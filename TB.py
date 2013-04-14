@@ -97,7 +97,7 @@ def unpack_f_R2s(par,X,Y,lmf=None):
 #   //CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
 #   //CurveFitDialog/ Equation:
 #   //CurveFitDialog/    f(x) = R20+(Psi/kEX)*(1-((4*x)/kEX)*tanh(kEX/(4*x)))
-#   //CurveFitDialog/   
+#   //CurveFitDialog/
 #   //CurveFitDialog/ End of Equation
 #   //CurveFitDialog/ Independent Variables 1
 #   //CurveFitDialog/ x
@@ -652,7 +652,7 @@ def getdecay(dic,mets=False,NIstop=False):
         print "Doing multiprocess fitting for decay rates"
         logger.info("Doing multiprocess fitting for decay rates")
         pool = Pool(processes=dic['Flags']['multiprocess'])
-        multi_res = pool.map(multi_f_expdecay, multi_inp_arr) 
+        multi_res = pool.map(multi_f_expdecay, multi_inp_arr)
         #from handythread import foreach
         #multi_res = foreach(multi_f_expdecay,multi_inp_arr,threads=dic['Flags']['multiprocess'],return_=True)
         for i in range(len(multi_sort_arr)):
@@ -679,7 +679,8 @@ def getrelax(dic,mets=False,NIstop=False):
     slicet = len(ncyc_arr)
     dic['relax'] = {}
     if not mets: mets = dic['qMDDmet'][0]
-    for met in mets:        Int = dic['Int'][met]
+    for met in mets:
+        Int = dic['Int'][met]
         filenr = dic['filenr'][met]
         dic['relax'][met] = {}
         NIarr = dic['NIarr'][met]
@@ -735,9 +736,17 @@ def getrelax(dic,mets=False,NIstop=False):
                     nu = ncyc_arr[i]/time_T2
                     nu_arr.append(nu)
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
-                    R2eff = -1.0/time_T2*log(MetInt/averageZero)
-                    R2eff_arr.append(R2eff)
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
+                    try:
+                        R2eff = -1.0/time_T2*log(MetInt/averageZero)
+                        R2eff_arr.append(R2eff)
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
+                        OK_R2eff = True
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                    except (Exception) as e:
+                        print "Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e)
+                        logger.info("Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e))
+                        OK_R2eff = False
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
                     i+=1
                 dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
                 dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
@@ -992,7 +1001,7 @@ def getglobfit(dic,mets=False,peaklist=False,NIstop=False):
                     print "It took: %s"%(datetime.now()-startTime)
                 else:
                     print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
-                    print "%s No Global fit for NI=%s, since len(sel_p):%s"%(met,NI,len(peaks))                    
+                    print "%s No Global fit for NI=%s, since len(sel_p):%s"%(met,NI,len(peaks))
             else:
                 print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
                 print "%s No Global fit for NI=%s, since len(peaks):%s"%(met,NI,len(peaks))
@@ -1080,7 +1089,7 @@ def getglobfit_slow(dic,mets=False,peaklist=False,NIstop=False):
                     print "It took: %s"%(datetime.now()-startTime)
                 else:
                     print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
-                    print "%s No Global fit for NI=%s, since len(sel_p):%s"%(met,NI,len(peaks))                    
+                    print "%s No Global fit for NI=%s, since len(sel_p):%s"%(met,NI,len(peaks))
             else:
                 print "################### METHOD %s########Global Fit NI=%s##############"%(met,NI)
                 print "%s No Global fit for NI=%s, since len(peaks):%s"%(met,NI,len(peaks))
@@ -1210,7 +1219,7 @@ def getglob_chisqr_pearson(dic,mets=False,NIstop=False,Ini=False,gkey='rates',pk
                 for peak in peaks:
                     gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
                     sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
-                    chisqr_sing = sf['chisqr'] 
+                    chisqr_sing = sf['chisqr']
                     chisqr_glob = gf['chisqr']
                     NIlist.append(float(NI))
                     chisqr_sing_list.append(chisqr_sing)
