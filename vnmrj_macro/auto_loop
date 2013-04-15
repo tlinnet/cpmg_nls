@@ -1,0 +1,140 @@
+format(n,1,0):fnam
+BPsvf('/home/sbinlab/LDN/T1rhoData/NCBD_20130414_pH6p5_19C_3p5Murea/ldn_20130414_NCBD_15N_pH6p5_19C_3p5Murea_t1rho_'+fnam)
+n=n+1
+echo(n)
+cd('/home/sbinlab/vnmrsys/exp87/')
+
+
+
+
+if n>155 then auto_end endif
+if n=1 then  ncyc=0     dpwr2slock=46 deltadof2=0    ss=512    random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=2 then  ncyc=10                                 ss=16     random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=3 then  ncyc=40                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=4 then  ncyc=4                                            random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=5 then  ncyc=20                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=6 then  ncyc=0     dpwr2slock=46 deltadof2=5000           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=7 then  ncyc=10                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=8 then  ncyc=40                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=9 then  ncyc=4                                            random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=10 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=11 then  ncyc=0     dpwr2slock=46 deltadof2=1000          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=12 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=13 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=14 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=15 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=16 then  ncyc=0     dpwr2slock=48 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=17 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=18 then  ncyc=14                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=19 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=20 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=21 then  ncyc=0     dpwr2slock=44 deltadof2=5000          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=22 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=23 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=24 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=25 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=26 then  ncyc=0     dpwr2slock=46 deltadof2=20000         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=27 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=28 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=29 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=30 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=31 then  ncyc=0     dpwr2slock=34 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=32 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=33 then  ncyc=6                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=34 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=35 then  ncyc=2                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=36 then  ncyc=0     dpwr2slock=42 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=37 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=38 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=39 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=40 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=41 then  ncyc=0     dpwr2slock=46 deltadof2=500           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=42 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=43 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=44 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=45 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=46 then  ncyc=0     dpwr2slock=44 deltadof2=1000          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=47 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=48 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=49 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=50 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=51 then  ncyc=0     dpwr2slock=46 deltadof2=2000          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=52 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=53 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=54 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=55 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=56 then  ncyc=0     dpwr2slock=44 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=57 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=58 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=59 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=60 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=61 then  ncyc=0     dpwr2slock=46 deltadof2=10000         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=62 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=63 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=64 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=65 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=66 then  ncyc=0     dpwr2slock=48 deltadof2=3500          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=67 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=68 then  ncyc=14                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=69 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=70 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=71 then  ncyc=0     dpwr2slock=36 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=72 then  ncyc=8                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=73 then  ncyc=14                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=74 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=75 then  ncyc=2                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=76 then  ncyc=0     dpwr2slock=40 deltadof2=0             random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=77 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=78 then  ncyc=40                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=79 then  ncyc=4                                           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=80 then  ncyc=20                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=81 then  ncyc=0     dpwr2slock=42 deltadof2=500           random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=82 then  ncyc=10                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=83 then  ncyc=40                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=84 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=85 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=86 then  ncyc=0     dpwr2slock=42 deltadof2=1000         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=87 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=88 then  ncyc=40                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=89 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=90 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=91 then  ncyc=0     dpwr2slock=46 deltadof2=7500         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=92 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=93 then  ncyc=40                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=94 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=95 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=96 then  ncyc=0     dpwr2slock=44 deltadof2=10000        random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=97 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=98 then  ncyc=40                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=99 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=100 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=101 then  ncyc=0     dpwr2slock=48 deltadof2=500          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=103 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=104 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=105 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=106 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=110 then  ncyc=0     dpwr2slock=48 deltadof2=-500         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=111 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=112 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=113 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=114 then  ncyc=20                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=115 then  ncyc=0     dpwr2slock=36 deltadof2=500          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=116 then  ncyc=8                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=117 then  ncyc=18                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=118 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=119 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=120 then  ncyc=0     dpwr2slock=34 deltadof2=500          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=121 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=122 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=123 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=124 then  ncyc=8                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=125 then  ncyc=0     dpwr2slock=36 deltadof2=-500         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=126 then  ncyc=8                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=127 then  ncyc=18                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=128 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=129 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=130 then  ncyc=0     dpwr2slock=34 deltadof2=-500         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=131 then  ncyc=10                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=132 then  ncyc=14                                         random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=133 then  ncyc=4                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
+if n=134 then  ncyc=8                                          random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif

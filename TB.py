@@ -10,7 +10,7 @@ from multiprocessing import Pool
 module_logger = logging.getLogger("TB.TB")
 
 #### Standard size of some figures
-figsize = 16
+figsize = 12
 titfont = 26
 labfont = 12
 figfont = 12
@@ -18,6 +18,7 @@ figfont = 12
 ##### To handle "RuntimeWarning" from fitting functions to be handled as errors
 import warnings
 warnings.simplefilter('error')
+#warnings.simplefilter('ignore')
 
 ####################################### Fit functions ##################################
 def f_R2s(pars,time,data=None):
@@ -1218,7 +1219,10 @@ def getglob_chisqr_pearson(dic,mets=False,NIstop=False,Ini=False,gkey='rates',pk
                 chisqr_glob_list = []
                 for peak in peaks:
                     gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
-                    sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
+                    if not Ini:
+                        sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
+                    else:
+                        sf = dic['gfit'][met][str(NIsf)][str(peak)]['%s'%pkey]
                     chisqr_sing = sf['chisqr']
                     chisqr_glob = gf['chisqr']
                     NIlist.append(float(NI))
@@ -1261,9 +1265,14 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False,Ini=False,gkey='rates',p
                 par_sing_list_e = []
                 par_glob_list = []
                 par_glob_list_e = []
+                peaknames = []
                 for peak in peaks:
+                    resn = dic['Int'][met][str(peak)]['resn']
                     gf = dic['gfit'][met][str(NI)][str(peak)]['%s'%pkey]
-                    sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
+                    if not Ini:
+                        sf = dic['%s'%gkey][met][str(NIsf)][str(peak)]['%s'%pkey]
+                    else:
+                        sf = dic['gfit'][met][str(NIsf)][str(peak)]['%s'%pkey]
                     par_sing = sf['par']['%s_v'%par]
                     par_sing_e = sf['par']['%s_e'%par]
                     par_glob = gf['par']['%s_v'%par]
@@ -1273,8 +1282,10 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False,Ini=False,gkey='rates',p
                     par_sing_list_e.append(par_sing_e)
                     par_glob_list.append(par_glob)
                     par_glob_list_e.append(par_glob_e)
+                    peaknames.append('%s %s'%(peak,resn))
                 NI_pear = array([NIlist,par_sing_list,par_sing_list_e,par_glob_list,par_glob_list_e]).T
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_data%s'%(par,t)] = NI_pear
+                dic['gfit'][met][str(NI)]['par']['Corr']['%s_resn%s'%(par,t)] = peaknames
                 Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,3])
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff%s'%(par,t)] = Pearson_Corr_Coeff
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value%s'%(par,t)] = Pearson_Corr_Coeff_tailed_p_value
@@ -1741,11 +1752,16 @@ def plot_single_pearson(dic,par,mets=False,NIa=False,Ini=False):
     for NI in NIarr:
         if not Ini: t = ''
         else: t = '_ini'
-        fig = figure('Pearson_NI=%s, par=%s %s'%(NI,par,t),figsize=(figsize, figsize/1.618))
+        #fig = figure('Pearson_NI=%s, par=%s %s'%(NI,par,t)) #figsize=(figsize, figsize)#/1.618
         imet = 1
         for met in mets:
-            ax = fig.add_subplot('%s1%s'%(len(mets),imet))
+            print 'Pearson_NI=%s, par=%s met=%s %s'%(NI,par,met,t)
+            fig = figure('Pearson_NI=%s, par=%s met=%s %s'%(NI,par,met,t),figsize=(figsize, figsize)) #figsize=(figsize, figsize)#/1.618
+            #fig = figure()
+            ax = fig.add_subplot('111')
+            #ax = fig.add_subplot('%s1%s'%(len(mets),imet))
             data = dic['gfit'][met][str(NI)]['par']['Corr']['%s_data%s'%(par,t)]
+            peaknames = dic['gfit'][met][str(NI)]['par']['Corr']['%s_resn%s'%(par,t)]
             Pearson_Corr_Coeff = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff%s'%(par,t)]
             Pearson_Corr_Coeff_tailed_p_value = dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value%s'%(par,t)]
             lin_slope = dic['gfit'][met][str(NI)]['par']['Corr']['%s_lin_slope%s'%(par,t)]
@@ -1757,14 +1773,17 @@ def plot_single_pearson(dic,par,mets=False,NIa=False,Ini=False):
             ax.errorbar(data[:,1],data[:,3],xerr=data[:,2],yerr=data[:,4],fmt='.',label='%s %s %s'%(met,par,t)) #ax.lines[-1].get_color()
             ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1])),'-',color=ax.lines[-1].get_color(),label='Slope=1')
             ax.plot(np.concatenate(([0], data[:,1])),np.concatenate(([0], data[:,1]))*slope,'-',label='a=%3.2f, pearson=%3.2f'%(slope,Pearson_Corr_Coeff))
+            for i in range(len(data[:,1])):
+                ax.annotate('%s'%(peaknames[i]), xy=(data[:,1][i],data[:,3][i]), xycoords='data', xytext=(data[:,1][i],data[:,3][i]), textcoords='data', rotation=-45, size=8) #'axes fraction'
             ax.set_ylabel('Global fit')
             if not Ini: ax.set_xlabel('Single fit')
             else: ax.set_xlabel('Initial global fit')
             ax.set_ylim(0,max(data[:,1]*1.05))
             ax.set_xlim(0,max(data[:,1]*1.05))
-            box = ax.get_position()
-            ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
-            ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.95),prop={'size':8}) # Put a legend to the right of the current axis
+            #box = ax.get_position()
+            #ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
+            #ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.95),prop={'size':8}) # Put a legend to the right of the current axis
+            ax.legend(loc='best')
             ax.grid('on')
             imet+=1
         print "Write: show() , to see graphs"

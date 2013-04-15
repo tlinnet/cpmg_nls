@@ -22,7 +22,6 @@ setenv NUSRANDOM "y"
 #TRHO_init.sh init
 #TRHO_init.sh run_all >> $TRHOFIDS/logfile.log
 
-# PROCESS=init for initialization and stopping at 0plane.fid and phase, or PROCESS=run_all
 setenv TRHOFIDS "/home/tlinnet/kte/t1rho/bblM_20130104_pH6_5C_0Murea_normal_retry"
 setenv NUSRANDOM "y"
 TRHO_init.sh run_all >> $TRHOFIDS/logfile.log

@@ -1,0 +1,9 @@
+format(n,1,0):fnam
+BPsvf('/home/sbinlab/vnmrsys/data/HEWL_N15_CPMG/lis_20130411_15N_HEWL_N15_CPMG_Rex_fm_my_v2_S_'+fnam)
+n=n+1
+echo(n)
+format(n,1,0):n1
+cd('/home/sbinlab/vnmrsys/exp17/')
+
+if n>36 then auto_end endif
+if n<37 then ss=16 shell('sed -n '+n1+'p ../maclib/ncycList.txt'):ncyc random(2e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3  && shuf nls.hdr_3 -o nls.hdr_3'):$dum auto_pulse endif
