@@ -4,9 +4,6 @@ n=n+1
 echo(n)
 cd('/home/sbinlab/vnmrsys/exp87/')
 
-
-
-
 if n>155 then auto_end endif
 if n=1 then  ncyc=0     dpwr2slock=46 deltadof2=0    ss=512    random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
 if n=2 then  ncyc=10                                 ss=16     random(3e4):seedSP BP_NLSset shell('grep ^0 nls.hdr_3 || sed -i 1c\0 nls.hdr_3 &&  shuf nls.hdr_3 -o nls.hdr_3'):$dum  auto_pulse endif
