@@ -23,6 +23,23 @@ warnings.simplefilter('error')
 #warnings.simplefilter('ignore')
 
 ####################################### Fit functions ##################################
+#Function R2cpmg_fast(w,x) : FitFunc
+#	Wave w
+#	Variable x
+#   //CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+#   //CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+#   //CurveFitDialog/ Equation:
+#   //CurveFitDialog/    f(x) = R20+(Psi/kEX)*(1-((4*x)/kEX)*tanh(kEX/(4*x)))
+#   //CurveFitDialog/
+#   //CurveFitDialog/ End of Equation
+#   //CurveFitDialog/ Independent Variables 1
+#   //CurveFitDialog/ x
+#   //CurveFitDialog/ Coefficients 3
+#   //CurveFitDialog/ w[0] = R20
+#   //CurveFitDialog/ w[1] = kEX
+#   //CurveFitDialog/ w[2] = Psi
+#	   return w[0]+(w[2]/w[1])*(1-((4*x)/w[1])*tanh(w[1]/(4*x)))
+##############################
 def f_R2s(pars,time,data=None):
     R2 = pars['R2'].value
     model = R2+zeros(len(time))
@@ -93,28 +110,35 @@ def unpack_f_R2s(par,X,Y,lmf=None):
 #    return w[0]+0.5*(w[1]-2*x*acosh(Dp*cosh(np)-Dm*cos(nm)))
 #End
 
-#Function R2cpmg_fast(w,x) : FitFunc
-#	Wave w
-#	Variable x
-#   //CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
-#   //CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
-#   //CurveFitDialog/ Equation:
-#   //CurveFitDialog/    f(x) = R20+(Psi/kEX)*(1-((4*x)/kEX)*tanh(kEX/(4*x)))
-#   //CurveFitDialog/
-#   //CurveFitDialog/ End of Equation
-#   //CurveFitDialog/ Independent Variables 1
-#   //CurveFitDialog/ x
-#   //CurveFitDialog/ Coefficients 3
-#   //CurveFitDialog/ w[0] = R20
-#   //CurveFitDialog/ w[1] = kEX
-#   //CurveFitDialog/ w[2] = Psi
-#	   return w[0]+(w[2]/w[1])*(1-((4*x)/w[1])*tanh(w[1]/(4*x)))
+def f_R2cpmg_RC72(pars,nu,data=None):
+    #http://dx.doi.org.ep.fjernadgang.kb.dk/10.1016/0022-2364(72)90090-X
+    # Richard & Carver 1972
+    # A general two-site solution for the chemical exchange produced dependence of T2 upon the carr-Purcell pulse separation
+    # Journal of Magnetic Resonance (1972), Volume 6, Issue 1, January 1972, Pages 89-105
+    #
+    # Variable: R2, kEX, w, pA
+    R2 = pars['R2'].value
+    kEX = pars['kEX'].value
+    w = pars['w'].value
+    pA = pars['pA'].value
+    #
+    psi = kEX**2-w**2
+    z = -2*w*kEX*(2*pA-1)
+    Dp = 0.5*(1+(psi+2*w**2)/sqrt(psi**2+z**2))
+    Dm = 0.5*(-1+(psi+2*w**2)/sqrt(psi**2+z**2))
+    np = 1.0/2/sqrt(2)/nu*sqrt(psi+sqrt(psi**2+z**2))
+    nm = 1.0/2/sqrt(2)/nu*sqrt(-psi+sqrt(psi**2+z**2))
+    #
+    model = R2+0.5*(kEX-2*nu*arccosh(Dp*cosh(np)-Dm*cos(nm)))
+    if data is None:
+        return model
+    return (model-data)
 
 def f_R2cpmg_slow(pars,nu,data=None):
     #The inverted chevron plot measured by NMR relaxation reveals a native-like unfolding intermediate in acyl-CoA binding protein.
     #Kaare Teilum, Flemming M Poulsen, Mikael Akke in Proceedings of the National Academy of Sciences of the United States of America (2006)
-    # Tollinger_kay http://pubs.acs.org/doi/abs/10.1021/ja011300z Slow Dynamics in Folded and Unfolded States of an SH3 Domain, 
-    # Martin Tollinger , Nikolai R. Skrynnikov , Frans A. A. Mulder , Julie D. Forman-Kay ,and Lewis E. Kay.  J. Am. Chem. Soc., 2001, 123 (46), pp 11341–1135
+    # Tollinger_kay http://pubs.acs.org/doi/abs/10.1021/ja011300z Slow Dynamics in Folded and Unfolded States of an SH3 Domain,
+    # Martin Tollinger , Nikolai R. Skrynnikov , Frans A. A. Mulder , Julie D. Forman-Kay ,and Lewis E. Kay.  J. Am. Chem. Soc., 2001, 123 (46)
     R2 = pars['R2'].value
     Domega = pars['Domega'].value
     ka = pars['ka'].value
@@ -674,13 +698,8 @@ def getdecay(dic,mets=False,NIstop=False):
 def getrelax(dic,mets=False,NIstop=False):
     startTime = datetime.now()
     logger = logging.getLogger("TB.TB.getrelax")
-#    multiprocess = dic['Flags']['multiprocess']
-#    multi_inp_arr = []
-#    multi_sort_arr = []
     ncyc_arr = dic['ncyc']
     time_T2 = dic['time_T2']
-#    centerPPM = dic['NMRpar']['centerPPM']
-#    frq = dic['NMRpar']['frq']
     slicet = len(ncyc_arr)
     dic['relax'] = {}
     if not mets: mets = dic['qMDDmet'][0]
@@ -817,20 +836,11 @@ def getrelax(dic,mets=False,NIstop=False):
     logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
     return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
 
-def getrelax_RC69(dic,mets=False,NIstop=False):
-    #http://dx.doi.org.ep.fjernadgang.kb.dk/10.1016/0022-2364(72)90090-X
-    # Richard & Carver 1969
-    # A general two-site solution for the chemical exchange produced dependence of T2 upon the carr-Purcell pulse separation
-    # Journal of Magnetic Resonance (1969), Volume 6, Issue 1, January 1972, Pages 89–105
+def getrelax_RC72(dic,mets=False,NIstop=False):
     startTime = datetime.now()
-    logger = logging.getLogger("TB.TB.getrelax_RC69")
-#    multiprocess = dic['Flags']['multiprocess']
-#    multi_inp_arr = []
-#    multi_sort_arr = []
+    logger = logging.getLogger("TB.TB.getrelax_RC72")
     ncyc_arr = dic['ncyc']
     time_T2 = dic['time_T2']
-#    centerPPM = dic['NMRpar']['centerPPM']
-#    frq = dic['NMRpar']['frq']
     slicet = len(ncyc_arr)
     dic['relax'] = {}
     if not mets: mets = dic['qMDDmet'][0]
@@ -849,7 +859,7 @@ def getrelax_RC69(dic,mets=False,NIstop=False):
             print "%s - Getting relaxation rates for NI=%s"%(met,NI)
             dic['relax'][met][str(NI)] = {}
             Pval_peaks = []
-            #peaks = dic['peakrange'][met]
+            peaks = dic['peakrange'][met]
             peaks = ['57']
             for peak in peaks:
                 dic['relax'][met][str(NI)][str(peak)] = {}
@@ -917,7 +927,7 @@ def getrelax_RC69(dic,mets=False,NIstop=False):
                 Fval, Fdist, Pval = False, False, False
                 # Calculate for R2 simple
                 dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
-                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'] = {}
+                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'] = {}
                 try:
                     par_R2s = lmfit.Parameters()
                     par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
@@ -932,40 +942,41 @@ def getrelax_RC69(dic,mets=False,NIstop=False):
                     OK_R2s = False
                     dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
                 # Calculate for R2 slow
-                try:
-                    par_R2cpmg_slow = lmfit.Parameters()
-                    par_R2cpmg_slow.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
-                    par_R2cpmg_slow.add('Domega', value=dic['guess']['s_Domega'], vary=True, min=0.0)
-                    par_R2cpmg_slow.add('ka', value=dic['guess']['s_ka'], vary=True, min=0.0)
-                    lmf_R2cpmg_slow = lmfit.minimize(f_R2cpmg_slow, par_R2cpmg_slow, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
-                    dic_R2cpmg_slow = unpack_f_R2cpmg_slow(par_R2cpmg_slow,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_slow)
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'].update(dic_R2cpmg_slow)
-                    OK_R2cpmg_slow = True
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
-                    #print lmf_R2cpmg_slow.success
-                except (Exception) as e:
-                    print "Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
-                    logger.info("Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
-                    OK_R2cpmg_slow = False
-                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
-                if OK_R2s and OK_R2cpmg_slow:
-                    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_slow['chisqr'],dic_R2cpmg_slow['NDF'])
-                dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
-                dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
-                dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
-                if Pval==False:
-                    pass
-                elif Pval!=False:
-                    Pval_peaks.append(peak)
+                #try:
+                par_R2cpmg_RC72 = lmfit.Parameters()
+                par_R2cpmg_RC72.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                par_R2cpmg_RC72.add('kEX', value=dic['guess']['s_kEX'], vary=True, min=0.0)
+                par_R2cpmg_RC72.add('w', value=dic['guess']['s_w'], vary=True)
+                par_R2cpmg_RC72.add('pA', value=dic['guess']['s_pA'], vary=True)
+                lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72, par_R2cpmg_RC72, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+                #dic_R2cpmg_RC72 = unpack_f_R2cpmg_RC72(par_R2cpmg_RC72,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_RC72)
+                #dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'].update(dic_R2cpmg_RC72)
+                OK_R2cpmg_RC72 = True
+                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
+                #print lmf_R2cpmg_RC72.success
+                #except (Exception) as e:
+                #    print "Cannot fit R2cpmg_RC72 for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                #    logger.info("Cannot fit R2cpmg_RC72 for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                #    OK_R2cpmg_RC72 = False
+                #    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
+                #if OK_R2s and OK_R2cpmg_RC72:
+                #    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_RC72['chisqr'],dic_R2cpmg_RC72['NDF'])
+                #dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
+                #dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
+                #dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
+                #if Pval==False:
+                #    pass
+                #elif Pval!=False:
+                #    Pval_peaks.append(peak)
 
-            dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
-            print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
-            logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
-            print "Peaks:%s"%(Pval_peaks)
-            logger.info("Peaks:%s"%(Pval_peaks))
+            #dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
+            #print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
+            #logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
+            #print "Peaks:%s"%(Pval_peaks)
+            #logger.info("Peaks:%s"%(Pval_peaks))
     print "Done relaxation rates. It took: %s"%(datetime.now()-startTime)
-    logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
-    return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
+    #logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
+    return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_RC72['par']
 
 def getrates(dic,mets=False,NIstop=False):
     logger = logging.getLogger("TB.TB.getrates")
@@ -1633,7 +1644,7 @@ def plotrates(dics,mets=False,peaks=False,NIa=False,glob=False):
                         if glob:
                             X_Y_Sigma_Fit_exch = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']['X_Y_Sigma_Fit']
                             print "plotting global fit"
-                        else: 
+                        else:
                             X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
                         datX_f_R1r_exch = X_Y_Sigma_Fit_exch[0]
                         datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
