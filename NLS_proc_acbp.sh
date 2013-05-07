@@ -32,6 +32,13 @@ setenv NITER 500
 setenv CPMGFID "/home/tlinnet/kte/acbp/acbp_cpmg_disp_04MGuHCl_40C_041223_CS100_MDD500.fid"
 setenv CS_niter 100
 setenv NITER 500
+#NLS_init.sh run_all >> $CPMGFID/logfile.log
+
+# Running for normal, no Noise
+setenv MDD_NOISE 0.0
+setenv CS_niter 10
+setenv NITER 50
+setenv CPMGFID "/home/tlinnet/kte/acbp/acbp_cpmg_disp_04MGuHCl_40C_041223_normal_noNoise.fid"
 NLS_init.sh run_all >> $CPMGFID/logfile.log
 
 ###############

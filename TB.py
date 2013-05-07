@@ -1,6 +1,8 @@
 from pylab import *
 import numpy
 import scipy.optimize
+import matplotlib as mpl
+mpl.rcParams['text.usetex']=True
 import scipy.stats.distributions
 import logging
 from datetime import datetime
@@ -111,6 +113,8 @@ def unpack_f_R2s(par,X,Y,lmf=None):
 def f_R2cpmg_slow(pars,nu,data=None):
     #The inverted chevron plot measured by NMR relaxation reveals a native-like unfolding intermediate in acyl-CoA binding protein.
     #Kaare Teilum, Flemming M Poulsen, Mikael Akke in Proceedings of the National Academy of Sciences of the United States of America (2006)
+    # Tollinger_kay http://pubs.acs.org/doi/abs/10.1021/ja011300z Slow Dynamics in Folded and Unfolded States of an SH3 Domain, 
+    # Martin Tollinger , Nikolai R. Skrynnikov , Frans A. A. Mulder , Julie D. Forman-Kay ,and Lewis E. Kay.  J. Am. Chem. Soc., 2001, 123 (46), pp 11341–1135
     R2 = pars['R2'].value
     Domega = pars['Domega'].value
     ka = pars['ka'].value
@@ -813,6 +817,156 @@ def getrelax(dic,mets=False,NIstop=False):
     logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
     return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
 
+def getrelax_RC69(dic,mets=False,NIstop=False):
+    #http://dx.doi.org.ep.fjernadgang.kb.dk/10.1016/0022-2364(72)90090-X
+    # Richard & Carver 1969
+    # A general two-site solution for the chemical exchange produced dependence of T2 upon the carr-Purcell pulse separation
+    # Journal of Magnetic Resonance (1969), Volume 6, Issue 1, January 1972, Pages 89–105
+    startTime = datetime.now()
+    logger = logging.getLogger("TB.TB.getrelax_RC69")
+#    multiprocess = dic['Flags']['multiprocess']
+#    multi_inp_arr = []
+#    multi_sort_arr = []
+    ncyc_arr = dic['ncyc']
+    time_T2 = dic['time_T2']
+#    centerPPM = dic['NMRpar']['centerPPM']
+#    frq = dic['NMRpar']['frq']
+    slicet = len(ncyc_arr)
+    dic['relax'] = {}
+    if not mets: mets = dic['qMDDmet'][0]
+    for met in mets:
+        Int = dic['Int'][met]
+        filenr = dic['filenr'][met]
+        dic['relax'][met] = {}
+        NIarr = dic['NIarr'][met]
+        for NI in NIarr:
+            if NIstop:
+                if NI <= NIstop: break
+                else: pass
+            else:
+                if NI <= dic['NIstop']: break
+                else: pass
+            print "%s - Getting relaxation rates for NI=%s"%(met,NI)
+            dic['relax'][met][str(NI)] = {}
+            Pval_peaks = []
+            #peaks = dic['peakrange'][met]
+            peaks = ['57']
+            for peak in peaks:
+                dic['relax'][met][str(NI)][str(peak)] = {}
+                peakname = Int[str(peak)]['resn']
+                dic['relax'][met][str(NI)][str(peak)]['resn'] = peakname
+                #print peakname
+                MetInt_arr = []
+                nu_arr = []
+                i = 0
+                for fs in range(filenr):
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)] = {}
+                    FTInt = Int[str(peak)]['FTInt'][fs]
+                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                    MetInt = FTInt*NIInt
+                    MetInt_arr.append(MetInt)
+                    nu = ncyc_arr[i]/time_T2
+                    nu_arr.append(nu)
+                    i+=1
+                nu_arr,MetInt_arr = zip(*sorted(zip(nu_arr, MetInt_arr)))
+                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                averageZero = average(MetInt_arr[:nu_slice])
+                dic['relax'][met][str(NI)][str(peak)]['averageZero'] = averageZero
+                #
+                CS_N = Int[str(peak)]['CS_N']
+                CS_H = Int[str(peak)]['CS_H']
+                CS_H_arr = []
+                CS_N_arr = []
+                R2eff_arr = []
+                nu_arr = []
+                i = 0
+                for fs in range(filenr):
+                    FTInt = Int[str(peak)]['FTInt'][fs]
+                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                    MetInt = FTInt*NIInt
+                    CS_H_arr.append(CS_H[fs])
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
+                    CS_N_arr.append(CS_N[fs])
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
+                    nu = ncyc_arr[i]/time_T2
+                    nu_arr.append(nu)
+                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
+                    try:
+                        R2eff = -1.0/time_T2*log(MetInt/averageZero)
+                        R2eff_arr.append(R2eff)
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
+                        OK_R2eff = True
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                    except (Exception) as e:
+                        print "Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e)
+                        logger.info("Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e))
+                        OK_R2eff = False
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                    i+=1
+                dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
+                dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
+                nu_arr,R2eff_arr = zip(*sorted(zip(nu_arr, R2eff_arr)))
+                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                nu_arr_s = array(nu_arr[nu_slice:])
+                R2eff_arr_s = array(R2eff_arr[nu_slice:])
+                dic['relax'][met][str(NI)][str(peak)]['nu_arr'] = nu_arr
+                dic['relax'][met][str(NI)][str(peak)]['nu_arr_s'] = nu_arr_s
+                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
+                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
+                dic['relax'][met][str(NI)][str(peak)]['nu_slice'] = nu_slice
+                Fval, Fdist, Pval = False, False, False
+                # Calculate for R2 simple
+                dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
+                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'] = {}
+                try:
+                    par_R2s = lmfit.Parameters()
+                    par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2s = unpack_f_R2s(par_R2s,nu_arr_s,R2eff_arr_s,lmf_R2s)
+                    dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
+                    OK_R2s = True
+                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+                except (Exception) as e:
+                    print "Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                    OK_R2s = False
+                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+                # Calculate for R2 slow
+                try:
+                    par_R2cpmg_slow = lmfit.Parameters()
+                    par_R2cpmg_slow.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+                    par_R2cpmg_slow.add('Domega', value=dic['guess']['s_Domega'], vary=True, min=0.0)
+                    par_R2cpmg_slow.add('ka', value=dic['guess']['s_ka'], vary=True, min=0.0)
+                    lmf_R2cpmg_slow = lmfit.minimize(f_R2cpmg_slow, par_R2cpmg_slow, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+                    dic_R2cpmg_slow = unpack_f_R2cpmg_slow(par_R2cpmg_slow,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_slow)
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'].update(dic_R2cpmg_slow)
+                    OK_R2cpmg_slow = True
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
+                    #print lmf_R2cpmg_slow.success
+                except (Exception) as e:
+                    print "Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+                    logger.info("Cannot fit R2cpmg_slow for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+                    OK_R2cpmg_slow = False
+                    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow']['OK_fit'] = OK_R2cpmg_slow
+                if OK_R2s and OK_R2cpmg_slow:
+                    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_slow['chisqr'],dic_R2cpmg_slow['NDF'])
+                dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
+                dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
+                dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
+                if Pval==False:
+                    pass
+                elif Pval!=False:
+                    Pval_peaks.append(peak)
+
+            dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
+            print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
+            logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
+            print "Peaks:%s"%(Pval_peaks)
+            logger.info("Peaks:%s"%(Pval_peaks))
+    print "Done relaxation rates. It took: %s"%(datetime.now()-startTime)
+    logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
+    return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
+
 def getrates(dic,mets=False,NIstop=False):
     logger = logging.getLogger("TB.TB.getrates")
     startTime = datetime.now()
@@ -1192,8 +1346,8 @@ def get_glob_pearsons(dic,pars,mets=False,NIstop=False,Ini=False,gkey='rates',pk
     if not mets: mets = dic['qMDDmet'][0]
     getglob_chisqr_pearson(dic,mets,NIstop,Ini,gkey,pkey)
     for par in pars:
-        getglob_par_pearson(dic,par,mets,NIstop,Ini,gkey,pkey)
-    return()
+        a,b,c = getglob_par_pearson(dic,par,mets,NIstop,Ini,gkey,pkey)
+    return(a,b,c)
 
 def getglob_chisqr_pearson(dic,mets=False,NIstop=False,Ini=False,gkey='rates',pkey='R1r_exch'):
     if not mets: mets = dic['qMDDmet'][0]
@@ -1287,6 +1441,7 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False,Ini=False,gkey='rates',p
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_data%s'%(par,t)] = NI_pear
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_resn%s'%(par,t)] = peaknames
                 Pearson_Corr_Coeff,Pearson_Corr_Coeff_tailed_p_value = scipy.stats.pearsonr(NI_pear[:,1], NI_pear[:,3])
+                print NI, Pearson_Corr_Coeff
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff%s'%(par,t)] = Pearson_Corr_Coeff
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_Pearson_Corr_Coeff_tailed_p_value%s'%(par,t)] = Pearson_Corr_Coeff_tailed_p_value
                 lin_slope, lin_inter, lin_r_value, lin_p_value, lin_std_err = scipy.stats.linregress(NI_pear[:,1],NI_pear[:,3])
@@ -1300,7 +1455,7 @@ def getglob_par_pearson(dic,par,mets=False,NIstop=False,Ini=False,gkey='rates',p
                 slope, _, _, _ = np.linalg.lstsq(single_x, glob_x)
                 slope = float(slope)
                 dic['gfit'][met][str(NI)]['par']['Corr']['%s_slope%s'%(par,t)] = slope
-    return()
+    return(NI_pear[:,1],NI_pear[:,3],NI)
 
 ################ Plot functions ###########################
 def plotstats(dics,mets):
@@ -1417,7 +1572,8 @@ def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
                         bx.plot(datX_f_R2cpmg_slow,calcR2cpmg_slow,"o",mfc='none',mec=bx.lines[-1].get_color())#
                         #R2cpmg_slow graph
                         bx.set_title('R2cpmg slow fitting')
-                        bx.set_xlabel('Time')
+                        #bx.set_xlabel('Time')
+                        bx.set_xlabel(r'$\nu$ CPMG')
                         bx.set_ylabel('R2cpmg slow coef')
                         box = bx.get_position()
                         bx.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
@@ -1425,7 +1581,8 @@ def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
                         bx.grid('on')
                 #R1r graph
                 ax.set_title('R2 fitting')
-                ax.set_xlabel('Time')
+                #ax.set_xlabel('Time')
+                ax.set_xlabel(r'$\nu$ CPMG')
                 ax.set_ylabel('R2 coef')
                 box = ax.get_position()
                 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
@@ -1435,7 +1592,7 @@ def plotrelaxation(dics,mets=False,peaks=False,NIa=False):
 #    #show()
     return()
 
-def plotrates(dics,mets=False,peaks=False,NIa=False):
+def plotrates(dics,mets=False,peaks=False,NIa=False,glob=False):
     for dic in dics:
         desc_name = dic['desc']['name']
         unique_omega1 = sort(f5(dic['omega1']))
@@ -1446,6 +1603,7 @@ def plotrates(dics,mets=False,peaks=False,NIa=False):
             else: NIarr = NIa
             print NIarr
             for NI in NIarr:
+                print NI
                 figR1r = figure('R1r_%s_%s'%(NI,desc_name),figsize=(figsize, figsize/1.618))
                 ax = figR1r.add_subplot(111)
                 for peak in peaks:
@@ -1472,12 +1630,20 @@ def plotrates(dics,mets=False,peaks=False,NIa=False):
                         figR1r_exch = figure('R1r_exch_%s_%s_%s'%(NI,peak,desc_name),figsize=(figsize, figsize/1.618))
                         bx = figR1r_exch.add_subplot(111)
                         # Get values for R1r_exch
-                        X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
+                        if glob:
+                            X_Y_Sigma_Fit_exch = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']['X_Y_Sigma_Fit']
+                            print "plotting global fit"
+                        else: 
+                            X_Y_Sigma_Fit_exch = dc['R1r_exch']['X_Y_Sigma_Fit']
                         datX_f_R1r_exch = X_Y_Sigma_Fit_exch[0]
                         datY_f_R1r_exch = X_Y_Sigma_Fit_exch[1]
                         datY_f_R1r_exch_err = X_Y_Sigma_Fit_exch[2]
                         calcR1r_exch = X_Y_Sigma_Fit_exch[3]
-                        par_R1r_exch = dc['R1r_exch']['par']
+                        if glob:
+                            par_R1r_exch = dic['gfit'][met][str(NI)][str(peak)]['R1r_exch']['par']
+                        else:
+                            par_R1r_exch = dc['R1r_exch']['par']
+                        print par_R1r_exch
                         tiltAngle_arr_s, omega1_arr_s = zip(*sorted(zip(datX_f_R1r_exch[0], datX_f_R1r_exch[1])))
                         datXs_f_R1r_exch = [array(tiltAngle_arr_s), array(omega1_arr_s)]
                         datYs_f_R1r_exch = f_R1r_exch_calc(par_R1r_exch,datXs_f_R1r_exch)
@@ -1570,7 +1736,7 @@ def plot_globalpar(dics,mets=False,NIstop=False,globalpar='kEX',gkey='rates',ay=
     #box = ax.get_position()
     #ax.set_position([box.x0, box.y0, box.width * 0.8, box.height]) # Shink current axis by 20%
     #ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8}) # Put a legend to the right of the current axis
-    ax.legend(loc='best')
+    ax.legend(loc='lower left')
     ax.grid('on')
     #
     bx.set_ylabel('chisqr')
@@ -1778,8 +1944,8 @@ def plot_single_pearson(dic,par,mets=False,NIa=False,Ini=False):
             ax.set_ylabel('Global fit')
             if not Ini: ax.set_xlabel('Single fit')
             else: ax.set_xlabel('Initial global fit')
-            ax.set_ylim(0,max(data[:,1]*1.05))
-            ax.set_xlim(0,max(data[:,1]*1.05))
+            #ax.set_ylim(0,max(data[:,1]*1.05))
+            #ax.set_xlim(0,max(data[:,1]*1.05))
             #box = ax.get_position()
             #ax.set_position([box.x0, box.y0, box.width * 0.95, box.height]) # Shink current axis by 20%
             #ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.95),prop={'size':8}) # Put a legend to the right of the current axis
