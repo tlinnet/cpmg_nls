@@ -839,6 +839,7 @@ def getrelax(dic,mets=False,NIstop=False):
 def getrelax_RC72(dic,mets=False,NIstop=False):
     startTime = datetime.now()
     logger = logging.getLogger("TB.TB.getrelax_RC72")
+    print dic
     ncyc_arr = dic['ncyc']
     time_T2 = dic['time_T2']
     slicet = len(ncyc_arr)
