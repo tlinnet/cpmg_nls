@@ -5,6 +5,7 @@ import matplotlib as mpl
 mpl.rcParams['text.usetex']=True
 import scipy.stats.distributions
 import logging
+import collections
 from datetime import datetime
 import os
 import lmfit #See http://newville.github.com/lmfit-py/parameters.html
@@ -133,6 +134,44 @@ def f_R2cpmg_RC72(pars,nu,data=None):
     if data is None:
         return model
     return (model-data)
+
+def f_R2cpmg_RC72_calc(par,nu):
+    R2 = par['R2_v']
+    kEX = par['kEX_v']
+    w = par['w_v']
+    pA = par['pA_v']
+    #
+    psi = kEX**2-w**2
+    z = -2*w*kEX*(2*pA-1)
+    Dp = 0.5*(1+(psi+2*w**2)/sqrt(psi**2+z**2))
+    Dm = 0.5*(-1+(psi+2*w**2)/sqrt(psi**2+z**2))
+    np = 1.0/2/sqrt(2)/nu*sqrt(psi+sqrt(psi**2+z**2))
+    nm = 1.0/2/sqrt(2)/nu*sqrt(-psi+sqrt(psi**2+z**2))
+    #
+    model = R2+0.5*(kEX-2*nu*arccosh(Dp*cosh(np)-Dm*cos(nm)))
+    return model
+
+#def f_R2cpmg_slow_global(pars,sel_p,nu_a,R2eff_a,R2eff_err_a=None):
+def f_R2cpmg_RC72_fields(pars,fields,nu_a,R2eff_a,R2eff_err_a=None):
+    toterr = np.array([])
+    #print pars['ka'].value
+    for i,field in enumerate(fields):
+        nu =nu_a[i];R2eff=R2eff_a[i]
+#        if R2eff_err_a is not None:
+#            R2eff_err=R2eff_err_a[i]
+        # Much faster to use a dictionary, and pass to a calc function.
+        wcalc = float(field)/100.0*pars['w'].value
+        #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA_%s'%field].value,'w_v':wcalc}
+        par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'],'w_v':wcalc}
+        Yfit = f_R2cpmg_RC72_calc(par,nu)
+        if R2eff_err_a is None:
+            erri = Yfit - R2eff
+        else:
+            erri = (Yfit - R2eff)/R2eff_err
+        toterr = np.concatenate((toterr, erri))
+    return toterr
+
+###########################################
 
 def f_R2cpmg_slow(pars,nu,data=None):
     #The inverted chevron plot measured by NMR relaxation reveals a native-like unfolding intermediate in acyl-CoA binding protein.
@@ -757,15 +796,16 @@ def getrelax(dic,mets=False,NIstop=False):
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
                     CS_N_arr.append(CS_N[fs])
                     dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
-                    nu = ncyc_arr[i]/time_T2
-                    nu_arr.append(nu)
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
                     try:
                         R2eff = -1.0/time_T2*log(MetInt/averageZero)
                         R2eff_arr.append(R2eff)
                         dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
                         OK_R2eff = True
                         dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                        #
+                        nu = ncyc_arr[i]/time_T2
+                        nu_arr.append(nu)
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
                     except (Exception) as e:
                         print "Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e)
                         logger.info("Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e))
@@ -783,8 +823,8 @@ def getrelax(dic,mets=False,NIstop=False):
                 dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
                 dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
                 dic['relax'][met][str(NI)][str(peak)]['nu_slice'] = nu_slice
-                Fval, Fdist, Pval = False, False, False
                 # Calculate for R2 simple
+                Fval, Fdist, Pval = False, False, False
                 dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
                 dic['relax'][met][str(NI)][str(peak)]['R2cpmg_slow'] = {}
                 try:
@@ -836,148 +876,215 @@ def getrelax(dic,mets=False,NIstop=False):
     logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
     return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_slow['par']
 
-def getrelax_RC72(dic,mets=False,NIstop=False):
+def getrelax_RC72(dics,mets=False,NIstop=False,sguess=False):
     startTime = datetime.now()
     logger = logging.getLogger("TB.TB.getrelax_RC72")
-    print dic
-    ncyc_arr = dic['ncyc']
-    time_T2 = dic['time_T2']
-    slicet = len(ncyc_arr)
-    dic['relax'] = {}
-    if not mets: mets = dic['qMDDmet'][0]
+    rdic = collections.OrderedDict()
+    for dic in dics:
+        ncyc_arr = dic['ncyc']
+        time_T2 = dic['time_T2']
+        field = dic['field']
+        rdic[str(field)] = {}
+        slicet = len(ncyc_arr)
+        dic['relax'] = {}
+        if not mets: mets = dic['qMDDmet'][0]
+        for met in mets:
+            Int = dic['Int'][met]
+            filenr = dic['filenr'][met]
+            dic['relax'][met] = {}
+            NIarr = dic['NIarr'][met]
+            rdic[str(field)][met] = {}
+            for NI in NIarr:
+                if NIstop:
+                    if NI <= NIstop: break
+                    else: pass
+                else:
+                    if NI <= dic['NIstop']: break
+                    else: pass
+                print "%s - Getting relaxation rates for NI=%s"%(met,NI)
+                dic['relax'][met][str(NI)] = {}
+                peaks = dic['peakrange'][met]
+                #peaks = ['57']
+                rdic[str(field)][met][str(NI)] = {}
+                for peak in peaks:
+                    dic['relax'][met][str(NI)][str(peak)] = {}
+                    peakname = Int[str(peak)]['resn']
+                    if peakname == '?-?':
+                        #print "Skipping peak: ?-?"
+                        continue
+                    dic['relax'][met][str(NI)][str(peak)]['resn'] = peakname
+                    #print peakname
+                    MetInt_arr = []
+                    nu_arr = []
+                    i = 0
+                    for fs in range(filenr):
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)] = {}
+                        FTInt = Int[str(peak)]['FTInt'][fs]
+                        NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                        MetInt = FTInt*NIInt
+                        MetInt_arr.append(MetInt)
+                        nu = ncyc_arr[i]/time_T2
+                        nu_arr.append(nu)
+                        i+=1
+                    nu_arr,MetInt_arr = zip(*sorted(zip(nu_arr, MetInt_arr)))
+                    nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                    averageZero = average(MetInt_arr[:nu_slice])
+                    dic['relax'][met][str(NI)][str(peak)]['averageZero'] = averageZero
+                    #
+                    CS_N = Int[str(peak)]['CS_N']
+                    CS_H = Int[str(peak)]['CS_H']
+                    CS_H_arr = []
+                    CS_N_arr = []
+                    R2eff_arr = []
+                    nu_arr = []
+                    i = 0
+                    for fs in range(filenr):
+                        FTInt = Int[str(peak)]['FTInt'][fs]
+                        NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
+                        MetInt = FTInt*NIInt
+                        CS_H_arr.append(CS_H[fs])
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
+                        CS_N_arr.append(CS_N[fs])
+                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
+                        try:
+                            R2eff = -1.0/time_T2*log(MetInt/averageZero)
+                            R2eff_arr.append(R2eff)
+                            dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
+                            OK_R2eff = True
+                            dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                            #
+                            nu = ncyc_arr[i]/time_T2
+                            nu_arr.append(nu)
+                            dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
+                        except (Exception) as e:
+                            print "Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e)
+                            logger.info("Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e))
+                            OK_R2eff = False
+                            dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
+                        i+=1
+                    dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
+                    dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
+                    nu_arr,R2eff_arr = zip(*sorted(zip(nu_arr, R2eff_arr)))
+                    nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
+                    nu_arr_s = array(nu_arr[nu_slice:])
+                    R2eff_arr_s = array(R2eff_arr[nu_slice:])
+                    dic['relax'][met][str(NI)][str(peak)]['nu_arr'] = nu_arr
+                    dic['relax'][met][str(NI)][str(peak)]['nu_arr_s'] = nu_arr_s
+                    dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
+                    dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
+                    dic['relax'][met][str(NI)][str(peak)]['nu_slice'] = nu_slice
+
+                    rdic[str(field)][met][str(NI)][peakname]={'peak':peak,'R2eff_arr_s':R2eff_arr_s,'nu_arr_s':nu_arr_s}
+    # Collecting nu arrays
+    fields = rdic.keys()
+    mets = rdic[fields[0]]
     for met in mets:
-        Int = dic['Int'][met]
-        filenr = dic['filenr'][met]
-        dic['relax'][met] = {}
-        NIarr = dic['NIarr'][met]
+        NIarr = rdic[fields[0]][met].keys()
+        NIarr = map(int, NIarr)
+        rdic[met] = {}
         for NI in NIarr:
-            if NIstop:
-                if NI <= NIstop: break
-                else: pass
-            else:
-                if NI <= dic['NIstop']: break
-                else: pass
-            print "%s - Getting relaxation rates for NI=%s"%(met,NI)
-            dic['relax'][met][str(NI)] = {}
             Pval_peaks = []
-            peaks = dic['peakrange'][met]
-            peaks = ['57']
-            for peak in peaks:
-                dic['relax'][met][str(NI)][str(peak)] = {}
-                peakname = Int[str(peak)]['resn']
-                dic['relax'][met][str(NI)][str(peak)]['resn'] = peakname
-                #print peakname
-                MetInt_arr = []
-                nu_arr = []
-                i = 0
-                for fs in range(filenr):
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)] = {}
-                    FTInt = Int[str(peak)]['FTInt'][fs]
-                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
-                    MetInt = FTInt*NIInt
-                    MetInt_arr.append(MetInt)
-                    nu = ncyc_arr[i]/time_T2
-                    nu_arr.append(nu)
-                    i+=1
-                nu_arr,MetInt_arr = zip(*sorted(zip(nu_arr, MetInt_arr)))
-                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
-                averageZero = average(MetInt_arr[:nu_slice])
-                dic['relax'][met][str(NI)][str(peak)]['averageZero'] = averageZero
-                #
-                CS_N = Int[str(peak)]['CS_N']
-                CS_H = Int[str(peak)]['CS_H']
-                CS_H_arr = []
-                CS_N_arr = []
-                R2eff_arr = []
-                nu_arr = []
-                i = 0
-                for fs in range(filenr):
-                    FTInt = Int[str(peak)]['FTInt'][fs]
-                    NIInt = Int[str(peak)]['NIInt'][str(NI)][fs]
-                    MetInt = FTInt*NIInt
-                    CS_H_arr.append(CS_H[fs])
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_H'] = CS_H[fs]
-                    CS_N_arr.append(CS_N[fs])
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['CS_N'] = CS_N[fs]
-                    nu = ncyc_arr[i]/time_T2
-                    nu_arr.append(nu)
-                    dic['relax'][met][str(NI)][str(peak)][str(fs)]['nu'] = nu
-                    try:
-                        R2eff = -1.0/time_T2*log(MetInt/averageZero)
-                        R2eff_arr.append(R2eff)
-                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['R2eff'] = R2eff
-                        OK_R2eff = True
-                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
-                    except (Exception) as e:
-                        print "Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e)
-                        logger.info("Cannot log calc R2eff for NI=%s Peak=%s %s. nu=%3.2f, MetInt=%3.2f, averageZero=%3.2f, fs=%s Reason: %s"%(NI, peak, peakname, nu, MetInt, averageZero, fs, e))
-                        OK_R2eff = False
-                        dic['relax'][met][str(NI)][str(peak)][str(fs)]['OK_R2eff'] = OK_R2eff
-                    i+=1
-                dic['relax'][met][str(NI)][str(peak)]['CS_H_mean'] = mean(CS_H_arr)
-                dic['relax'][met][str(NI)][str(peak)]['CS_N_mean'] = mean(CS_N_arr)
-                nu_arr,R2eff_arr = zip(*sorted(zip(nu_arr, R2eff_arr)))
-                nu_slice = next(x[0] for x in enumerate(nu_arr) if x[1] > 0.001)
-                nu_arr_s = array(nu_arr[nu_slice:])
-                R2eff_arr_s = array(R2eff_arr[nu_slice:])
-                dic['relax'][met][str(NI)][str(peak)]['nu_arr'] = nu_arr
-                dic['relax'][met][str(NI)][str(peak)]['nu_arr_s'] = nu_arr_s
-                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr'] = R2eff_arr
-                dic['relax'][met][str(NI)][str(peak)]['R2eff_arr_s'] = R2eff_arr_s
-                dic['relax'][met][str(NI)][str(peak)]['nu_slice'] = nu_slice
-                Fval, Fdist, Pval = False, False, False
-                # Calculate for R2 simple
-                dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
-                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'] = {}
-                try:
-                    par_R2s = lmfit.Parameters()
-                    par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
-                    lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
-                    dic_R2s = unpack_f_R2s(par_R2s,nu_arr_s,R2eff_arr_s,lmf_R2s)
-                    dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
-                    OK_R2s = True
-                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
-                except (Exception) as e:
-                    print "Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
-                    logger.info("Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
-                    OK_R2s = False
-                    dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+            peaknames = rdic[fields[0]][met][str(NI)].keys()
+            rdic[met][str(NI)] = {}
+            #peaknames = peaknames[:4]
+            for peakname in peaknames:
+                rdic[met][str(NI)][peakname] = {}
+                R2eff_arr_s_list = []
+                nu_arr_s_list = []
+                par_R2cpmg_RC72 = lmfit.Parameters()
+                for field in fields:
+                    peak = rdic[str(field)][met][str(NI)][peakname]['peak']
+                    R2eff_arr_s = rdic[str(field)][met][str(NI)][peakname]['R2eff_arr_s']
+                    R2eff_arr_s_list.append(R2eff_arr_s)
+                    nu_arr_s = rdic[str(field)][met][str(NI)][peakname]['nu_arr_s']
+                    nu_arr_s_list.append(nu_arr_s)
+
+                    par_R2cpmg_RC72.add('R2_%s'%field, value=sguess['s_R2'], vary=True, min=5.0, max=50.0)
+                    par_R2cpmg_RC72.add('kEX_%s'%field, value=sguess['s_kEX'], vary=True, min=100.0, max=10000.0)
+                    #par_R2cpmg_RC72.add('pA_%s'%field, value=sguess['s_pA'], vary=True, min=0.5, max=1.0)
+                par_R2cpmg_RC72.add('pA', value=sguess['s_pA'], vary=True, min=0.5, max=1.0)
+                par_R2cpmg_RC72.add('w', value=sguess['s_w'], vary=True, min=0.0)
+                lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72_fields, par_R2cpmg_RC72, args=(fields, nu_arr_s_list, R2eff_arr_s_list),method='leastsq')
+
+                fig = figure(figsize=(figsize, figsize/1.618))
+                ax = fig.add_subplot(111)
+                pars = par_R2cpmg_RC72
+                print peakname,
+                for key in pars:
+                    print key, pars[key].value,
+                print ""
+                for i,field in enumerate(fields):
+                    nu =nu_arr_s_list[i];R2eff=R2eff_arr_s_list[i]
+                    ax.plot(nu,R2eff,".",label='%s %s %s %s'%(met, NI, peakname, field))
+
+                    wcalc = float(field)/100.0*pars['w'].value
+                    #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA_%s'%field].value,'w_v':wcalc}
+                    par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'].value,'w_v':wcalc}
+                    Yfit = f_R2cpmg_RC72_calc(par,nu)
+                    ax.plot(nu,Yfit,"-",color=ax.lines[-1].get_color(), label='1')
+                    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8})
+
+    #            # Calculate for R2 simple
+    #            #Fval, Fdist, Pval = False, False, False
+    #            #dic['relax'][met][str(NI)][str(peak)]['R2s'] = {}
+    #            #dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'] = {}
+    #            try:
+    #                par_R2s = lmfit.Parameters()
+    #                par_R2s.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
+    #                lmf_R2s = lmfit.minimize(f_R2s, par_R2s, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
+    #                dic_R2s = unpack_f_R2s(par_R2s,nu_arr_s,R2eff_arr_s,lmf_R2s)
+    #                dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
+    #                OK_R2s = True
+    #                dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+    #            except (Exception) as e:
+    #               print "Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
+    #                logger.info("Cannot fit R2s for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+    #                OK_R2s = False
+    #                dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
                 # Calculate for R2 slow
                 #try:
-                par_R2cpmg_RC72 = lmfit.Parameters()
-                par_R2cpmg_RC72.add('R2', value=dic['guess']['s_R2'], vary=True, min=0.0)
-                par_R2cpmg_RC72.add('kEX', value=dic['guess']['s_kEX'], vary=True, min=0.0)
-                par_R2cpmg_RC72.add('w', value=dic['guess']['s_w'], vary=True)
-                par_R2cpmg_RC72.add('pA', value=dic['guess']['s_pA'], vary=True)
-                lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72, par_R2cpmg_RC72, args=(nu_arr_s, R2eff_arr_s),method='leastsq')
-                #dic_R2cpmg_RC72 = unpack_f_R2cpmg_RC72(par_R2cpmg_RC72,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_RC72)
-                #dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'].update(dic_R2cpmg_RC72)
-                OK_R2cpmg_RC72 = True
-                dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
-                #print lmf_R2cpmg_RC72.success
+                #    par_R2cpmg_RC72 = lmfit.Parameters()
+                #    par_R2cpmg_RC72.add('R2', value=dic['guess']['s_R2'], vary=True, min=5.0, max=50.0)
+                #    par_R2cpmg_RC72.add('kEX', value=dic['guess']['s_kEX'], vary=True, min=500.0, max=10000.0)
+                #    par_R2cpmg_RC72.add('w', value=dic['guess']['s_w'], vary=True, min=0.0)
+                #    par_R2cpmg_RC72.add('pA', value=dic['guess']['s_pA'], vary=True, min=0.5, max=1.0)
+                #    lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72, par_R2cpmg_RC72, args=(nu_arr_s_list[0], R2eff_arr_s_list[0]),method='leastsq')
+                #    #dic_R2cpmg_RC72 = unpack_f_R2cpmg_RC72(par_R2cpmg_RC72,nu_arr_s,R2eff_arr_s,lmf_R2cpmg_RC72)
+                #    #dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72'].update(dic_R2cpmg_RC72)
+                #    OK_R2cpmg_RC72 = True
+                #    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
+                #    print lmf_R2cpmg_RC72.success
                 #except (Exception) as e:
                 #    print "Cannot fit R2cpmg_RC72 for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e)
-                #    logger.info("Cannot fit R2cpmg_RC72 for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
-                #    OK_R2cpmg_RC72 = False
-                #    dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
-                #if OK_R2s and OK_R2cpmg_RC72:
-                #    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_RC72['chisqr'],dic_R2cpmg_RC72['NDF'])
-                #dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
-                #dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
-                #dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
-                #if Pval==False:
-                #    pass
-                #elif Pval!=False:
-                #    Pval_peaks.append(peak)
+    #           #     logger.info("Cannot fit R2cpmg_RC72 for NI=%s Peak=%s %s. Reason: %s"%(NI, peak, peakname, e))
+    #           #     OK_R2cpmg_RC72 = False
+    #           #     dic['relax'][met][str(NI)][str(peak)]['R2cpmg_RC72']['OK_fit'] = OK_R2cpmg_RC72
+                #fig = figure(figsize=(figsize, figsize/1.618))
+                #ax = fig.add_subplot(111)
+                #datY = f_R2cpmg_RC72(par_R2cpmg_RC72,nu_arr_s_list[0])
+                #ax.plot(nu_arr_s_list[0],R2eff_arr_s_list[0],'.-')
+                #ax.plot(nu_arr_s_list[0],datY,'.-')
+                #show()
+    #            #if OK_R2s and OK_R2cpmg_RC72:
+    #            #    Fval, Fdist, Pval = Ftest(dic_R2s['chisqr'],dic_R2s['NDF'],dic_R2cpmg_RC72['chisqr'],dic_R2cpmg_RC72['NDF'])
+    #            #dic['relax'][met][str(NI)][str(peak)]['Fval'] = Fval
+    #            #dic['relax'][met][str(NI)][str(peak)]['Fdist'] = Fdist
+    #            #dic['relax'][met][str(NI)][str(peak)]['Pval'] = Pval
+    #            #if Pval==False:
+    #            #    pass
+    #            #elif Pval!=False:
+    #            #    Pval_peaks.append(peak)
+    #
+    #        #dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
+    #        #print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
+    #        #logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
+        #print "Peaks:%s"%(Pval_peaks)
+        #logger.info("Peaks:%s"%(Pval_peaks))
 
-            #dic['relax'][met][str(NI)]['Pval_peaks'] = Pval_peaks
-            #print "Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI)
-            #logger.info("Following peak numbers passed the Ftest. %s/%s Met:%s NI=%s."%(len(Pval_peaks),len(peaks),met, NI))
-            #print "Peaks:%s"%(Pval_peaks)
-            #logger.info("Peaks:%s"%(Pval_peaks))
+    #show()
     print "Done relaxation rates. It took: %s"%(datetime.now()-startTime)
     #logger.info("Done relaxation rates. It took: %s"%(datetime.now()-startTime))
-    return() #nu_arr_s,R2eff_arr_s,dic_R2cpmg_RC72['par']
+    return(rdic,par_R2cpmg_RC72,par_R2cpmg_RC72)
 
 def getrates(dic,mets=False,NIstop=False):
     logger = logging.getLogger("TB.TB.getrates")
