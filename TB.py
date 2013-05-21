@@ -1,8 +1,8 @@
 from pylab import *
 import numpy
 import scipy.optimize
-import matplotlib as mpl
-mpl.rcParams['text.usetex']=True
+#import matplotlib as mpl
+#mpl.rcParams['text.usetex']=True
 import scipy.stats.distributions
 import logging
 import collections
@@ -151,7 +151,6 @@ def f_R2cpmg_RC72_calc(par,nu):
     model = R2+0.5*(kEX-2*nu*arccosh(Dp*cosh(np)-Dm*cos(nm)))
     return model
 
-#def f_R2cpmg_slow_global(pars,sel_p,nu_a,R2eff_a,R2eff_err_a=None):
 def f_R2cpmg_RC72_fields(pars,fields,nu_a,R2eff_a,R2eff_err_a=None):
     toterr = np.array([])
     #print pars['ka'].value
@@ -162,7 +161,8 @@ def f_R2cpmg_RC72_fields(pars,fields,nu_a,R2eff_a,R2eff_err_a=None):
         # Much faster to use a dictionary, and pass to a calc function.
         wcalc = float(field)/100.0*pars['w'].value
         #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA_%s'%field].value,'w_v':wcalc}
-        par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'],'w_v':wcalc}
+        #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'],'w_v':wcalc}
+        par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX'].value,'pA_v':pars['pA'].value,'w_v':wcalc}
         Yfit = f_R2cpmg_RC72_calc(par,nu)
         if R2eff_err_a is None:
             erri = Yfit - R2eff
@@ -170,6 +170,38 @@ def f_R2cpmg_RC72_fields(pars,fields,nu_a,R2eff_a,R2eff_err_a=None):
             erri = (Yfit - R2eff)/R2eff_err
         toterr = np.concatenate((toterr, erri))
     return toterr
+
+def unpack_f_R2cpmg_RC72_fields(pars,fields,nu_a,R2eff_a,lmf=None):
+    dic2 = {}
+    dic2['par']={}
+    dic2['par']['kEX_v'] = par['kEX'].value; dic2['par']['kEX_e'] = par['kEX'].stderr
+    dic2['par']['pA_v'] = par['pA'].value; dic2['par']['pA_e'] = par['pA'].stderr
+    dic2['par']['w_v'] = par['w'].value; dic2['par']['w_e'] = par['w'].stderr
+
+    Yfits = []
+    residuals = []
+    totresiduals = np.array([])
+    for i,field in enumerate(fields):
+        nu =nu_a[i];R2eff=R2eff_a[i]
+        Yfit = f_R2cpmg_RC72_calc(par,nu)
+        Yfits.append(Yfit)
+        dic2['par']['R2_v'] = par['R2_%s'%field].value; dic2['par']['R2_e'] = par['R2_%s'%field].stderr
+        residual = Yfit - R2eff
+        residuals.append(residual)
+        totresidual = np.concatenate((totresidual, residual))
+    dic2['Yfits']=Yfits
+    dic2['residuals'] = residuals
+    dic2['totresidual'] = totresidual
+    chisqr = sum(totresidual**2)
+    dic2['chisqr'] = chisqr
+    NDF = len(residual)-len(par)
+    dic2['NDF'] = NDF
+    #print NDF, lmf.nfree
+    dic2['what_is_this_called'] = np.sqrt(chisqr/NDF)
+    dic2['redchisqr'] = chisqr/NDF
+    x_y_fit = array([nu,Y,Yfit]).T
+    dic2['X_Y_Fit'] = x_y_fit
+    return(dic2)
 
 ###########################################
 
@@ -1000,11 +1032,18 @@ def getrelax_RC72(dics,mets=False,NIstop=False,sguess=False):
                     nu_arr_s_list.append(nu_arr_s)
 
                     par_R2cpmg_RC72.add('R2_%s'%field, value=sguess['s_R2'], vary=True, min=5.0, max=50.0)
-                    par_R2cpmg_RC72.add('kEX_%s'%field, value=sguess['s_kEX'], vary=True, min=100.0, max=10000.0)
                     #par_R2cpmg_RC72.add('pA_%s'%field, value=sguess['s_pA'], vary=True, min=0.5, max=1.0)
+                    #par_R2cpmg_RC72.add('kEX_%s'%field, value=sguess['s_kEX'], vary=True, min=100.0, max=10000.0)
                 par_R2cpmg_RC72.add('pA', value=sguess['s_pA'], vary=True, min=0.5, max=1.0)
+                par_R2cpmg_RC72.add('kEX', value=sguess['s_kEX'], vary=True, min=100.0, max=10000.0)
                 par_R2cpmg_RC72.add('w', value=sguess['s_w'], vary=True, min=0.0)
-                lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72_fields, par_R2cpmg_RC72, args=(fields, nu_arr_s_list, R2eff_arr_s_list),method='leastsq')
+                try:
+                    lmf_R2cpmg_RC72 = lmfit.minimize(f_R2cpmg_RC72_fields, par_R2cpmg_RC72, args=(fields, nu_arr_s_list, R2eff_arr_s_list),method='leastsq')
+                    dic_R2cpmg_RC72 = unpack_f_R2cpmg_RC72_fields(par_R2cpmg_RC72, fields, nu_arr_s_list, R2eff_arr_s_list, lmf_R2cpmg_RC72)
+                    #dic['relax'][met][str(NI)][str(peak)]['R2s'].update(dic_R2s)
+                    #OK_R2cpmg_RC72 = True
+                    #dic['relax'][met][str(NI)][str(peak)]['R2s']['OK_fit'] = OK_R2s
+
 
                 fig = figure(figsize=(figsize, figsize/1.618))
                 ax = fig.add_subplot(111)
@@ -1019,10 +1058,14 @@ def getrelax_RC72(dics,mets=False,NIstop=False,sguess=False):
 
                     wcalc = float(field)/100.0*pars['w'].value
                     #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA_%s'%field].value,'w_v':wcalc}
-                    par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'].value,'w_v':wcalc}
+                    #par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX_%s'%field].value,'pA_v':pars['pA'].value,'w_v':wcalc}
+                    par = {'R2_v':pars['R2_%s'%field].value,'kEX_v':pars['kEX'].value,'pA_v':pars['pA'].value,'w_v':wcalc}
                     Yfit = f_R2cpmg_RC72_calc(par,nu)
-                    ax.plot(nu,Yfit,"-",color=ax.lines[-1].get_color(), label='1')
-                    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8})
+                    ax.plot(nu,Yfit,"-",color=ax.lines[-1].get_color(), label='R2_%s=%3.2f, kEX=%3.2f, pA=%1.2f, w=%3.2f'%(field,pars['R2_%s'%field].value,pars['kEX'].value,pars['pA'].value,wcalc))
+                    #ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),prop={'size':8})
+                    ax.legend(loc='best', prop={'size':8})
+                    savefig('img/%s_%s_%s.png'%(peakname,NI,met))
+
 
     #            # Calculate for R2 simple
     #            #Fval, Fdist, Pval = False, False, False
