@@ -110,6 +110,6 @@ YOBS="ERR"
 if [ -f ../fid.com ]; then
 YOBS=`grep "yOBS" ../fid.com | awk '{print $4}'`
 fi
-SHEREKHAN = `which CPMG_7_sherekhan.py`
+SHEREKHAN=`which CPMG_7_sherekhan.py`
 cp -n $SHEREKHAN .
 ./CPMG_7_sherekhan.py table.txt $TIMET2 $YOBS
