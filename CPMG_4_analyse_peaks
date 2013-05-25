@@ -108,7 +108,7 @@ echo "0.95 is stats trust. 1=x for evaluating R2_app, 50 is maximum R2."
 
 YOBS="ERR"
 if [ -f ../fid.com ]; then
-YOBS=`grep "yOBS" fid.com | awk '{print $4}' ../fid.com`
+YOBS=`grep "yOBS" ../fid.com | awk '{print $4}'`
 fi
 SHEREKHAN = `which CPMG_7_sherekhan.py`
 cp -n $SHEREKHAN .
