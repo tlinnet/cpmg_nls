@@ -17,8 +17,8 @@ FILEEXT="${FILE##*.}"
 
 mkdir -p "CPMG_$FILENAME"
 cp -n $FILE "CPMG_$FILENAME"
-echo "Executing: /sbinlab2/public/CPMG_scripts/stPeakList.pl 0/test.ft2 CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat"
-/sbinlab2/public/CPMG_scripts/stPeakList.pl 0/test.ft2 CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat
+echo "Executing: /sbinlab2/tlinnet/CPMG_code/NLS_stPeakList.pl 0/test.ft2 CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat"
+/sbinlab2/tlinnet/CPMG_code/NLS_stPeakList.pl 0/test.ft2 CPMG_${FILENAME}/${FILE} > CPMG_${FILENAME}/${FILENAME}_0.dat
 cd "CPMG_$FILENAME"
 awk '{ sub(/\?-\?/, $1"&"); print }' ${FILENAME}_0.dat > ${FILENAME}_0.temp
 mv -f ${FILENAME}_0.temp ${FILENAME}_0.dat
@@ -94,4 +94,14 @@ sed -i "s/\$filebase\$i\/peaks.ser/\$filebase\$i.ser/g" extract_sums_to_table.pl
 #sed -i 's/printf "%7.6e "/printf "%7.6e \\n"/g' extract_sums_to_table.pl
 fi
 ./extract_sums_to_table.pl > table.txt
-CPMG_5_make_gnuplot table.txt
+
+GNUPLOT=`which CPMG_5_make_gnuplot`
+cp -n $GNUPLOT .
+./CPMG_5_make_gnuplot table.txt
+
+STAT=`which CPMG_6_find_stat_fast`
+cp -n $STAT .
+./CPMG_6_find_stat_fast table_plots/table_simple_complex.fit 0.95 1 50
+echo "Now execute:  CPMG_6_find_stat_fast table_plots/table_simple_complex.fit 0.95 1 50"
+echo "I do it for you"
+echo "0.95 is stats trust. 1=x for evaluating R2_app, 50 is maximum R2."

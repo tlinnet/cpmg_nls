@@ -11,7 +11,7 @@ FILEEXT="${FILE##*.}"
 rm -rf ${FILENAME}_plots
 mkdir -p ${FILENAME}_plots
 cd ${FILENAME}_plots
-cp ../$FILE .
+ln -s ../$FILE .
 
 MINX=`sed -n 2p $FILE | awk '{print $1}'`
 MAXX=`tail -1 $FILE | awk '{print $1}'`
@@ -134,8 +134,11 @@ plot "$FILESPEC.fit" using (\$1):(\$6) title "simple: rms of residuals" with lp,
 gnuplot $FILESPEC.plt
 
 for epsfile in *.eps; do eps2png -resolution 200 $epsfile; echo "Making png: $epsfile"; done
-#CPMG_6_find_stat $FILESPEC.fit 0.95 1 50; evince $FILESPEC.report.pdf &
-echo "CPMG_6_find_stat $FILESPEC.fit 0.95 1 50 peaks_20121005.shift.sort; evince $FILESPEC.report.pdf &"
-#pymol $FILESPEC.pml &
-echo "pymol $FILESPEC.pml &"
+
+#echo ""
+##CPMG_6_find_stat $FILESPEC.fit 0.95 1 50; evince $FILESPEC.report.pdf &
+#echo "CPMG_6_find_stat $FILESPEC.fit 0.95 1 50 peaks_20121005.shift.sort;"
+#echo "evince $FILESPEC.report.pdf &"
+##pymol $FILESPEC.pml &
+#echo "pymol $FILESPEC.pml &"
 

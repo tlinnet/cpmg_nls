@@ -1,0 +1,58 @@
+#!/sbinlab2/software/python-enthought-dis/epd-7.3-2-rh5-x86_64/bin/python2.7
+
+import sys, os, re, math
+from scipy.stats import distributions
+from operator import itemgetter, attrgetter
+from subprocess import call
+
+if len(sys.argv) > 4:
+    filename = sys.argv[1]
+    filebase, fileext = os.path.splitext(filename)
+    distlimit= float(sys.argv[2])
+    x=float(sys.argv[3])
+    R2_app_lim=float(sys.argv[4])
+else:
+    print "Please execute with arguments: table_plots/table_simple_complex.fit 0.95 1 50"
+    sys.exit()
+
+# Counting the column number, later subtracting 1 for python column way.
+WSSR1=7; NDF1=5; WSSR2=19; NDF2=17
+
+data=open(filename)
+lines=data.readlines()
+outdata=open(filebase+".stat","w")
+outdata.write(lines[0].rstrip()+"\t %10s \t %10s \t %10s \t %6s\n"%("Fval","Fdist","Pval","R2_app"))
+texarray=[]
+for i in range(1,len(lines)):
+    line=lines[i]
+    col = line.split()
+    filenr = int(col[8])
+    rescode = col[9]
+    R20b = round(float(col[10]),3)
+    R20b_err = round(float(col[11]),3)
+    kEXb = round(float(col[12]),3)
+    kEXb_err = round(float(col[13]),)
+    PHI = round(float(col[14]),3)
+    PHI_err = round(float(col[15]),3)
+    FIT_NDF = int(col[16])
+    FIT_WSSR = round(float(col[18]),3)
+    R2_app=R20b+(PHI/kEXb)*(1-2*math.tanh(kEXb/4/x)/kEXb*x*2)
+    P2mP1 = int(col[NDF1-1])-int(col[NDF2-1])
+    NmP2 = int(col[NDF2-1])
+    WSSR1val = float(col[WSSR1-1])
+    WSSR2val = float(col[WSSR2-1])
+    WSSR1mWSSR2 = WSSR1val-WSSR2val
+    Fval=(WSSR1mWSSR2/P2mP1)/(WSSR2val/NmP2)
+    Fdist= distributions.f.ppf(distlimit, P2mP1, NmP2)
+    if Fval > Fdist and kEXb > 0 and R2_app < R2_app_lim and PHI > 0:
+        Pval= (1-distributions.f.cdf(Fval, P2mP1, NmP2))
+        Fval=round(Fval,3); Fdist=round(Fdist,3); R2_app=round(R2_app,3)
+        outdata.write(line.rstrip()+"\t %10s \t %10s \t %e \t %6s \n"%(Fval,Fdist,Pval,R2_app))
+    else:
+        print "Discarding %s since: Fval=%3.2f, Fdist=%3.2f, kEXb=%3.2f, R2_app=%3.2f, PHI=%3.2f"%(rescode, Fval, Fdist, kEXb, R2_app, PHI)
+        Pval = 'NIL'
+        Fval=round(Fval,3); Fdist=round(Fdist,3); R2_app=round(R2_app,3)
+        outdata.write(line.rstrip()+"\t %10s \t %10s \t %1s \t %6s \n"%(Fval,Fdist,Pval,R2_app))
+    #print Pval
+
+data.close(); outdata.close()

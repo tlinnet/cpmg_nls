@@ -32,11 +32,11 @@ cp /sbinlab2/public/CPMG_scripts/fft_all.com $PWD
 fi
 
 echo 
-echo "I suggest run fft_all.com"
+echo "I suggest run fft_all.com, which I will do for you"
 echo "####################"
 echo "csh fft_all.com"
 echo "####################"
-
+csh fft_all.com
 echo
 echo "Now get a peak list"
 echo "In CCPNMR Analysis, you open one of you spectra from the relaxation series."

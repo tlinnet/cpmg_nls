@@ -28,19 +28,26 @@ cp /sbinlab2/public/CPMG_scripts/convert_all.com $PWD
 fi
 
 echo 
-echo "I suggest run convert_all.com"
+echo "I suggest run convert_all.com, which I will do for you"
 echo "####################"
 echo "csh convert_all.com"
 echo "####################"
-
+csh convert_all.com
 echo "Now we need to transform the spectra."
-echo "Process one of the files normally and copy the processing script to the experiment folder."
-echo "[m]->RClick Process 2D->Basic 2D"
+#echo "Process one of the files normally and copy the processing script to the experiment folder."
+echo "[m]->Right-Click Process 2D->Basic 2D"
 echo "Save->Execute->Done; then; RClick File->Select File->test.ft2->Read/draw->Done"
-echo "Press [h], and find P0 and P1, and push [m], change parameters and update script, save/execute, push [r]"
 echo "If your spectra look reversed (i.e. if your peaks do not seem to match your reference spectrum) it might be solved by changing to"
-echo "| nmrPipe -fn FT -neg \ to the fft.com script to the third lowest line."
-echo "Name the script fft.com, copy to above experiment folder.. "
-echo "For example from the '0' directory: cp nmrproc.com ../fft.com"
+echo "[m] '| nmrPipe -fn FT -neg \' to the script to the third lowest line."
+echo "Save->Execute->Done. Then push [r] to refresh."
+echo "Press [h], and find P0 and P1, and push [m], change parameters and update script"
+echo "The changes to '| nmrPipe  -fn PS xxx \' should be the FIRST line (The proton dimension) with PS"
+echo "save/execute, push [r] (read) and the [e] (erase settings) to see result in NMRdraw"
+#echo "Name the script fft.com, copy to above experiment folder.. "
+#echo "For example from the '0' directory: cp nmrproc.com ../fft.com"
 echo "And then run the next CPMG script"
+cd 0
+nmrDraw
+cp nmrproc.com ../fft.com
+cd ..
 
