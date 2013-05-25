@@ -75,6 +75,7 @@ for i,resi in enumerate(resis):
             val.append(pint)
         prevfreq=freq
     val = np.array(val)
+    valstd = val.std()
     dic[str(resinr)][str(prevfreq)]={'freq':prevfreq,'mean':val.mean(),'std':valstd}
     freqs.append(prevfreq)
     #print resi, freq, prevfreq, val, val.std(), val.mean()
@@ -95,9 +96,9 @@ for key, value in dic.iteritems():
     for freq in freqs:
         valstd = value[str(freq)]['std']
         if valstd == 0.0:
-            valstd = maxvalstd
+            valstd = maxvalstd+maxvalstd*0.01
         valmean = value[str(freq)]['mean']
-        outdata.write("%3.2f \t %3.5f \t %3.5f \n"%(freq,valmean,valstd))
+        outdata.write("%3.2f \t %3.7f \t %3.7f \n"%(freq,valmean,valstd))
 
 print "Now use out ", filebase+".sherekhan", "to upload to sherekhan.bionmr.org/app/calculation"
 outdata.close()
