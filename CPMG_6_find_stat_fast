@@ -54,5 +54,6 @@ for i in range(1,len(lines)):
         Fval=round(Fval,3); Fdist=round(Fdist,3); R2_app=round(R2_app,3)
         outdata.write(line.rstrip()+"\t %10s \t %10s \t %1s \t %6s \n"%(Fval,Fdist,Pval,R2_app))
     #print Pval
+print "Now check out ", filebase+".stat", "to find statistival values"
 
 data.close(); outdata.close()
