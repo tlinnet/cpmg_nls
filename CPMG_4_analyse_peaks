@@ -2,7 +2,7 @@
 
 PEAKFILES=($( ls *.sparky 2>/dev/null ))
 echo "Number of peakfiles ${#PEAKFILES[*]}"
-echo "Following sparky files was found:" 
+echo "Following sparky files was found:"
 echo -e "${PEAKFILES[*]} \n"
 PEAKS=${PEAKFILES[0]}
 read -p "Input peak file: " -i "$PEAKS" -e PEAKS
@@ -67,7 +67,7 @@ if [ $PLANE != "ERR" ]; then
       done
       echo "Made a time.dat file"
     fi
-  fi   
+  fi
 fi
 
 TIMET2="ERR"
@@ -105,3 +105,11 @@ cp -n $STAT .
 echo "Now execute:  CPMG_6_find_stat_fast table_plots/table_simple_complex.fit 0.95 1 50"
 echo "I do it for you"
 echo "0.95 is stats trust. 1=x for evaluating R2_app, 50 is maximum R2."
+
+YOBS="ERR"
+if [ -f ../fid.com ]; then
+YOBS=`grep "yOBS" fid.com | awk '{print $4}' ../fid.com`
+fi
+SHEREKHAN = `which CPMG_7_sherekhan.py`
+cp -n $SHEREKHAN .
+./CPMG_7_sherekhan.py table.txt $TIMET2 $YOBS
