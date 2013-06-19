@@ -66,7 +66,8 @@ for i,resi in enumerate(resis):
             val = np.array(val)
             #print resi, freq, prevfreq, val, val.std(), val.mean()
             valstd = val.std()
-            dic[str(resinr)][str(prevfreq)]={'freq':prevfreq,'mean':val.mean(),'std':valstd}
+            N_val = len(val)
+            dic[str(resinr)][str(prevfreq)]={'freq':prevfreq,'mean':val.mean(),'std':valstd,'N_val':N_val}
             freqs.append(prevfreq)
         if freq != curfreq:
             curfreq = freq
@@ -76,7 +77,8 @@ for i,resi in enumerate(resis):
         prevfreq=freq
     val = np.array(val)
     valstd = val.std()
-    dic[str(resinr)][str(prevfreq)]={'freq':prevfreq,'mean':val.mean(),'std':valstd}
+    N_val = len(val)
+    dic[str(resinr)][str(prevfreq)]={'freq':prevfreq,'mean':val.mean(),'std':valstd,'N_val':N_val}
     freqs.append(prevfreq)
     #print resi, freq, prevfreq, val, val.std(), val.mean()
 
@@ -89,14 +91,48 @@ for key, value in dic.iteritems():
     resn = value['resn']
     outdata.write("# %s%s\n"%(resn,resi))
     maxvalstd = 0
+#    for freq in freqs:
+#        valstd = value[str(freq)]['std']
+#        if valstd > maxvalstd:
+#            maxvalstd = valstd
+    list_std = []
+    GM = 0 #grand mean
     for freq in freqs:
         valstd = value[str(freq)]['std']
-        if valstd > maxvalstd:
-            maxvalstd = valstd
+        valmean = value[str(freq)]['mean']
+        N_val = value[str(freq)]['N_val']
+        if valstd > 0:
+            list_std.append([valstd, valmean, N_val])
+            GM += valmean
+    # See: http://www.physicsforums.com/showthread.php?t=268377
+    ESS = 0.0 # Error sum of square
+    TGSS = 0.0 # Total Group sum of Squares
+    N = 0
+    poolvar = 0
+    for i, values in enumerate(list_std):
+        std = values[0]
+        mean = values[1]
+        n = values[2]
+        N += n
+        variance = std**2
+        #DOF = n-1 # degrees of freedom
+        DOF = n # degrees of freedom
+        ESSG = variance*DOF #Error sum of square group
+        ESS += ESSG
+        GSS = n*(mean-GM)**2 # Group sum of Squares
+        TGSS += GSS
+        poolvar += (n-1)*variance
+    #GV = (ESS + TGSS) / (N-1) #grand variance
+    GV = (ESS + TGSS) / (N) #grand variance
+    #print ESS,N,TGSS
+    GST = math.sqrt(GV) #grand standard deviation
+    GST2 = math.sqrt(poolvar/(N-len(list_std))) #grand standard deviation
+    #print GST, GST2
     for freq in freqs:
         valstd = value[str(freq)]['std']
         if valstd == 0.0:
-            valstd = maxvalstd+maxvalstd*0.01
+            #valstd = maxvalstd+maxvalstd*0.01
+            valstd = GST2
         valmean = value[str(freq)]['mean']
         outdata.write("%3.2f \t %3.7f \t %3.7f \n"%(freq,valmean,valstd))
 
